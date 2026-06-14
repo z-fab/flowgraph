@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-model router — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">18 — Multi-model</span></nav>
+  <div class="demo-wrap">
+    <h1>Multi-model router</h1>
+    <p class="lead">Router classifica requests: queries simples vão para SLM barato; complexas para LLM grande.</p>
+    <div class="demo-tags"><span class="demo-tag ml">LLM</span><span class="demo-tag">avançado</span></div>
+    <div id="demo"></div>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/18-multi-model-routing.json');
+  </script>
+</body>
+</html>

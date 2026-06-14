@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowGraph — Galeria de exemplos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+</head>
+<body>
+  <header class="gallery-header">
+    <h1>FlowGraph — Galeria</h1>
+    <p>Diagramas animados com simulação de tokens. Dois primitivos (`port`, `process`) + JSON em <code>demos/configs/</code>.</p>
+    <p style="margin-top:0.75rem;font-size:0.85rem;color:#6B6560">Sirva com <code>python3 -m http.server 3456</code> na pasta <code>flowgraph/</code></p>
+  </header>
+
+  <div class="gallery-grid">
+    <a class="gallery-card" href="01-linear-basico.html">
+      <div class="level">● Básico</div>
+      <h2>Pipeline linear</h2>
+      <p>Três nós em cadeia — o mínimo para entender sources, process e emit.</p>
+    </a>
+    <a class="gallery-card" href="02-formas-estilos.html">
+      <div class="level">● Básico</div>
+      <h2>Formas e estilos</h2>
+      <p>Círculo, losango, triângulo, pills, arestas tracejadas e labels.</p>
+    </a>
+    <a class="gallery-card" href="03-burst-velocidades.html">
+      <div class="level">● Básico</div>
+      <h2>Burst e velocidades</h2>
+      <p>Grupos de tokens, spacing, cores e efeitos por source.</p>
+    </a>
+    <a class="gallery-card" href="04-gate-merge.html">
+      <div class="level">● Intermediário</div>
+      <h2>Gate / merge</h2>
+      <p>Dois fluxos convergem — nó só processa após receber N tokens.</p>
+    </a>
+    <a class="gallery-card" href="05-request-online.html">
+      <div class="level">● ML Serving</div>
+      <h2>Requisição online</h2>
+      <p>Cliente → Gateway → Features → Model Server → Resposta.</p>
+    </a>
+    <a class="gallery-card" href="06-batch-vs-online.html">
+      <div class="level">● ML Serving</div>
+      <h2>Batch vs online</h2>
+      <p>Dois caminhos paralelos: job agendado e inferência síncrona.</p>
+    </a>
+    <a class="gallery-card" href="07-etl-dados.html">
+      <div class="level">● Dados</div>
+      <h2>Pipeline ETL</h2>
+      <p>Ingestão → transform → validação → data warehouse.</p>
+    </a>
+    <a class="gallery-card" href="08-streaming-sse.html">
+      <div class="level">● Streaming</div>
+      <h2>Streaming SSE / WebSocket</h2>
+      <p>Request entra, tokens saem em burst contínuo para o cliente.</p>
+    </a>
+    <a class="gallery-card" href="09-treinamento-ml.html">
+      <div class="level">● ML</div>
+      <h2>Treinamento de modelo</h2>
+      <p>Dados → treino → validação → registro no model registry.</p>
+    </a>
+    <a class="gallery-card" href="10-agent-react.html">
+      <div class="level">● Agentes</div>
+      <h2>Agente ReAct</h2>
+      <p>Loop usuário → orquestrador → LLM ↔ tool → stream.</p>
+    </a>
+    <a class="gallery-card" href="11-fanout-fanin.html">
+      <div class="level">● Intermediário</div>
+      <h2>Fan-out / fan-in</h2>
+      <p>Dispatcher distribui para workers e agregador espera todos.</p>
+    </a>
+    <a class="gallery-card" href="12-kafka-pipeline.html">
+      <div class="level">● Dados</div>
+      <h2>Kafka pipeline</h2>
+      <p>Producer → tópicos → consumidores → sink.</p>
+    </a>
+    <a class="gallery-card" href="13-mlops-deploy.html">
+      <div class="level">● MLOps</div>
+      <h2>CI/CD de modelo</h2>
+      <p>Git push → testes → build → canary → produção.</p>
+    </a>
+    <a class="gallery-card" href="14-rag-pipeline.html">
+      <div class="level">● LLM</div>
+      <h2>RAG pipeline</h2>
+      <p>Query → embed → retrieval → rerank → LLM → resposta.</p>
+    </a>
+    <a class="gallery-card" href="15-microservices.html">
+      <div class="level">● Arquitetura</div>
+      <h2>Microservices + gateway</h2>
+      <p>API gateway roteando para auth, billing e core service.</p>
+    </a>
+    <a class="gallery-card" href="16-circuit-breaker.html">
+      <div class="level">● Confiabilidade</div>
+      <h2>Circuit breaker</h2>
+      <p>Tráfego normal, falhas acumulam, fallback ativa.</p>
+    </a>
+    <a class="gallery-card" href="17-event-sourcing.html">
+      <div class="level">● Avançado</div>
+      <h2>Event sourcing</h2>
+      <p>Comandos viram eventos append-only; projeções leem o log.</p>
+    </a>
+    <a class="gallery-card" href="18-multi-model-routing.html">
+      <div class="level">● Avançado</div>
+      <h2>Multi-model router</h2>
+      <p>Router envia por tamanho/complexidade para SLM ou LLM grande.</p>
+    </a>
+    <a class="gallery-card" href="19-micro-batching.html">
+      <div class="level">● ML Serving</div>
+      <h2>Micro-batching GPU</h2>
+      <p>Barra de progresso acumula requests até flush do batch.</p>
+    </a>
+    <a class="gallery-card" href="20-semaphore.html">
+      <div class="level">● Confiabilidade</div>
+      <h2>Semáforo / 429</h2>
+      <p>Capacidade limitada: aceitos vs rejeitados.</p>
+    </a>
+    <a class="gallery-card" href="21-mlp-forward.html">
+      <div class="level">● Redes neurais</div>
+      <h2>MLP forward pass</h2>
+      <p>Linear → ReLU → Linear → Softmax + skip connection.</p>
+    </a>
+    <a class="gallery-card" href="22-transformer-block.html">
+      <div class="level">● Redes neurais</div>
+      <h2>Transformer block</h2>
+      <p>MHA → FFN com loop autoregressivo.</p>
+    </a>
+    <a class="gallery-card" href="23-feedback-loop.html">
+      <div class="level">● Loop</div>
+      <h2>Feedback loop</h2>
+      <p>Controlador com sensor retornando ao início do ciclo.</p>
+    </a>
+    <a class="gallery-card" href="24-primitives-showcase.html">
+      <div class="level">● Spec v1</div>
+      <h2>Primitives showcase</h2>
+      <p>port + process com admission, gate, emit, retry e circuit — todos num grafo.</p>
+    </a>
+    <a class="gallery-card" href="25-playground.html">
+      <div class="level">● Authoring</div>
+      <h2>Playground</h2>
+      <p>Drag nodes, inspector Config, auto-layout dagre e métricas ao vivo.</p>
+    </a>
+    <a class="gallery-card" href="26-mlp-backprop.html">
+      <div class="level">● Redes neurais</div>
+      <h2>MLP forward + backprop</h2>
+      <p>Duas camadas ocultas: activations roxas à frente, gradientes laranja no caminho inverso.</p>
+    </a>
+    <a class="gallery-card" href="27-embed-view.html">
+      <div class="level">● Embed</div>
+      <h2>View-only</h2>
+      <p>Sem toolbar, drawer ou drag — diagrama puro para embed em docs/slides.</p>
+    </a>
+  </div>
+</body>
+</html>

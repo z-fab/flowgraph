@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fan-out fan-in — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">11 — Fan-out</span></nav>
+  <div class="demo-wrap">
+    <h1>Fan-out / fan-in</h1>
+    <p class="lead">Dispatcher fan-out com spread angular; labels de latência por worker.</p>
+    <div class="demo-tags"><span class="demo-tag">intermediário</span></div>
+    <div id="demo"></div>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/11-fanout-fanin.json');
+  </script>
+</body>
+</html>

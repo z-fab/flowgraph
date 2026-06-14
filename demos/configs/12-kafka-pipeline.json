@@ -1,0 +1,25 @@
+{
+  "title": "events.topic",
+  "viewport": { "height": 400, "padding": 50 },
+  "nodes": [
+    { "id": "prod", "type": "port", "role": "source", "shape": "circle", "icon": "send", "x": 90, "y": 200 },
+    { "id": "kafka", "type": "process", "label": "Kafka", "icon": "layers", "duration": 300, "emit": { "mode": "all" },
+      "pillTop": [{ "text": "events" }], "x": 260, "y": 200 },
+    { "id": "c1", "type": "process", "label": "Consumer A", "icon": "eye", "duration": 800, "x": 460, "y": 90 },
+    { "id": "c2", "type": "process", "label": "Consumer B", "icon": "eye", "duration": 600, "x": 460, "y": 200 },
+    { "id": "c3", "type": "process", "label": "Consumer C", "icon": "eye", "duration": 1000, "x": 460, "y": 310 },
+    { "id": "s1", "type": "port", "role": "sink", "label": "ClickHouse", "icon": "database", "tone": "success", "x": 640, "y": 90 },
+    { "id": "s2", "type": "port", "role": "sink", "label": "Alerts", "icon": "bell", "tone": "warning", "x": 640, "y": 200 },
+    { "id": "s3", "type": "port", "role": "sink", "label": "S3 archive", "icon": "archive", "tone": "success", "x": 640, "y": 310 }
+  ],
+  "edges": [
+    { "id": "pk", "from": "prod", "to": "kafka" },
+    { "id": "kc1", "from": "kafka", "to": "c1", "label": { "text": "part.0" } },
+    { "id": "kc2", "from": "kafka", "to": "c2" },
+    { "id": "kc3", "from": "kafka", "to": "c3", "label": { "text": "part.2" } },
+    { "id": "cs1", "from": "c1", "to": "s1", "stroke": { "color": "success" } },
+    { "id": "cs2", "from": "c2", "to": "s2", "stroke": { "color": "warning" } },
+    { "id": "cs3", "from": "c3", "to": "s3", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "pk", "interval": 2200, "burst": { "count": 2, "spacing": 55 }, "token": { "color": "#5B21B6", "size": 5 } }]
+}

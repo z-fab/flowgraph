@@ -1,0 +1,22 @@
+{
+  "title": "API Gateway",
+  "viewport": { "height": 380, "padding": 55 },
+  "nodes": [
+    { "id": "client", "type": "port", "role": "source", "label": "Client", "shape": "circle", "icon": "smartphone", "x": 80, "y": 190 },
+    { "id": "gw", "type": "process", "label": "Gateway", "icon": "router", "duration": 350, "emit": { "mode": "weighted" }, "x": 240, "y": 190 },
+    { "id": "auth", "type": "process", "label": "Auth", "icon": "key", "duration": 500, "x": 420, "y": 80, "tone": "primary" },
+    { "id": "bill", "type": "process", "label": "Billing", "icon": "credit-card", "duration": 700, "x": 420, "y": 190, "tone": "warning" },
+    { "id": "core", "type": "process", "label": "Core", "icon": "server", "duration": 900, "x": 420, "y": 300 },
+    { "id": "out", "type": "port", "role": "terminal", "label": "Response", "icon": "check", "tone": "success", "x": 600, "y": 190 }
+  ],
+  "edges": [
+    { "id": "c", "from": "client", "to": "gw" },
+    { "id": "a", "from": "gw", "to": "auth", "weight": 3, "label": { "text": "/auth" } },
+    { "id": "b", "from": "gw", "to": "bill", "weight": 2, "label": { "text": "/bill" } },
+    { "id": "k", "from": "gw", "to": "core", "weight": 5, "label": { "text": "/api" } },
+    { "id": "ra", "from": "auth", "to": "out", "stroke": { "dash": "dash" } },
+    { "id": "rb", "from": "bill", "to": "out", "stroke": { "dash": "dash" } },
+    { "id": "rk", "from": "core", "to": "out", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "c", "interval": 2500, "jitter": 400 }]
+}

@@ -1,0 +1,25 @@
+{
+  "title": "MapReduce",
+  "viewport": { "height": 440, "padding": 60 },
+  "tokens": { "color": "#7C3AED", "speed": 85, "size": 6 },
+  "nodes": [
+    { "id": "in", "type": "port", "role": "source", "label": "Input", "shape": "circle", "icon": "inbox", "x": 70, "y": 220 },
+    { "id": "disp", "type": "process", "label": "Dispatcher", "icon": "share-2", "duration": 350, "emit": { "mode": "all" }, "x": 220, "y": 220 },
+    { "id": "w1", "type": "process", "label": "Worker 1", "icon": "cpu", "duration": 900, "x": 430, "y": 70 },
+    { "id": "w2", "type": "process", "label": "Worker 2", "icon": "cpu", "duration": 1100, "x": 430, "y": 220 },
+    { "id": "w3", "type": "process", "label": "Worker 3", "icon": "cpu", "duration": 700, "x": 430, "y": 370 },
+    { "id": "agg", "type": "process", "label": "Aggregator", "icon": "layers", "gate": { "from": "all-edges", "count": 1 }, "duration": 700, "x": 620, "y": 220 },
+    { "id": "out", "type": "port", "role": "terminal", "label": "Output", "tone": "success", "x": 770, "y": 220 }
+  ],
+  "edges": [
+    { "id": "d1", "from": "in", "to": "disp", "label": { "text": "job" } },
+    { "id": "d2", "from": "disp", "to": "w1", "label": { "text": "w1" } },
+    { "id": "d3", "from": "disp", "to": "w2", "label": { "text": "w2" } },
+    { "id": "d4", "from": "disp", "to": "w3", "label": { "text": "w3" } },
+    { "id": "a1", "from": "w1", "to": "agg" },
+    { "id": "a2", "from": "w2", "to": "agg" },
+    { "id": "a3", "from": "w3", "to": "agg" },
+    { "id": "a4", "from": "agg", "to": "out", "stroke": { "color": "success" }, "label": { "text": "result" } }
+  ],
+  "sources": [{ "edge": "d1", "interval": 5000 }]
+}

@@ -1,0 +1,20 @@
+{
+  "title": "CI/CD deploy",
+  "viewport": { "height": 300, "padding": 50 },
+  "nodes": [
+    { "id": "git", "type": "port", "role": "source", "label": "Git push", "shape": "circle", "icon": "git-branch", "x": 80, "y": 150 },
+    { "id": "ci", "type": "process", "label": "CI tests", "icon": "check-circle", "duration": 900, "x": 230, "y": 150 },
+    { "id": "build", "type": "process", "label": "Build image", "icon": "box", "duration": 700, "x": 380, "y": 150 },
+    { "id": "canary", "type": "process", "label": "Canary", "icon": "percent", "duration": 400, "emit": { "mode": "weighted" }, "x": 530, "y": 150 },
+    { "id": "prod", "type": "port", "role": "sink", "label": "Production", "icon": "rocket", "tone": "success", "x": 680, "y": 100 },
+    { "id": "rollback", "type": "port", "role": "sink", "label": "Rollback", "icon": "undo", "tone": "danger", "x": 680, "y": 200 }
+  ],
+  "edges": [
+    { "id": "e1", "from": "git", "to": "ci" },
+    { "id": "e2", "from": "ci", "to": "build" },
+    { "id": "e3", "from": "build", "to": "canary" },
+    { "id": "ok", "from": "canary", "to": "prod", "weight": 8, "stroke": { "color": "success" }, "label": { "text": "promote" } },
+    { "id": "fail", "from": "canary", "to": "rollback", "weight": 2, "stroke": { "color": "danger", "dash": "dash" }, "label": { "text": "fail" } }
+  ],
+  "sources": [{ "edge": "e1", "interval": 5000 }]
+}

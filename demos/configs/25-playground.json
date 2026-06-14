@@ -1,0 +1,23 @@
+{
+  "title": "Playground",
+  "viewport": {
+    "height": 420,
+    "padding": 55,
+    "background": { "color": "#FAFAF8", "pattern": "dots", "patternSize": 18 }
+  },
+  "controls": { "layout": true },
+  "layout": { "engine": "dagre", "direction": "LR" },
+  "interaction": { "nodeDrag": true },
+  "metrics": { "charts": true, "globalDrawer": true, "nodeDrawer": true },
+  "tokens": { "color": "#7C3AED", "speed": 100, "size": 6 },
+  "nodes": [
+    { "id": "src", "type": "port", "role": "source", "shape": "circle", "icon": "inbox", "x": 80, "y": 200 },
+    { "id": "proc", "type": "process", "label": "Process", "icon": "cpu", "duration": 1200, "x": 260, "y": 200 },
+    { "id": "sink", "type": "port", "role": "sink", "label": "Out", "icon": "check", "tone": "success", "showReceived": true, "x": 440, "y": 200 }
+  ],
+  "edges": [
+    { "id": "in", "from": "src", "to": "proc" },
+    { "id": "out", "from": "proc", "to": "sink", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "in", "interval": 1400, "burst": { "count": 1, "spacing": 0 } }]
+}

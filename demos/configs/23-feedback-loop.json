@@ -1,0 +1,19 @@
+{
+  "title": "Closed-loop",
+  "viewport": { "height": 360, "padding": 60 },
+  "tokens": { "color": "#3D6B52", "speed": 85, "size": 6 },
+  "nodes": [
+    { "id": "set", "type": "port", "role": "source", "shape": "circle", "icon": "target", "x": 80, "y": 180 },
+    { "id": "ctrl", "type": "process", "label": "Controller", "icon": "sliders-horizontal", "gate": { "from": "any", "count": 1 }, "duration": 500, "x": 250, "y": 180 },
+    { "id": "plant", "type": "process", "label": "Plant", "icon": "factory", "tone": "warning", "duration": 1200, "x": 430, "y": 180 },
+    { "id": "sensor", "type": "process", "label": "Sensor", "icon": "gauge", "duration": 400, "retry": { "backEdge": "fb", "maxRetries": 1 }, "x": 610, "y": 180 }
+  ],
+  "edges": [
+    { "id": "e1", "from": "set", "to": "ctrl", "label": { "text": "ref" } },
+    { "id": "e2", "from": "ctrl", "to": "plant", "label": { "text": "u" } },
+    { "id": "e3", "from": "plant", "to": "sensor", "label": { "text": "y" } },
+    { "id": "fb", "from": "sensor", "to": "ctrl", "routing": "loopback", "stroke": { "color": "success", "dash": "dash" },
+      "label": { "text": "feedback" } }
+  ],
+  "sources": [{ "edge": "e1", "interval": 6000 }]
+}

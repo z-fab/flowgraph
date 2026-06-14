@@ -1,0 +1,24 @@
+{
+  "title": "Event log",
+  "viewport": { "height": 360, "padding": 55 },
+  "nodes": [
+    { "id": "cmd", "type": "port", "role": "source", "label": "Command", "shape": "circle", "icon": "terminal", "x": 80, "y": 180 },
+    { "id": "agg", "type": "process", "label": "Aggregate", "icon": "box", "duration": 500, "x": 230, "y": 180 },
+    { "id": "log", "type": "process", "label": "Event log", "icon": "scroll-text",
+      "admission": { "mode": "batch", "max": 3, "step": 1 }, "duration": 200,
+      "pillTop": [{ "text": "append-only", "tone": "primary" }], "x": 390, "y": 180 },
+    { "id": "proj1", "type": "process", "label": "Projection A", "icon": "eye", "duration": 700, "x": 560, "y": 100 },
+    { "id": "proj2", "type": "process", "label": "Projection B", "icon": "eye", "duration": 600, "x": 560, "y": 260 },
+    { "id": "read1", "type": "port", "role": "sink", "label": "Read model A", "icon": "table", "tone": "success", "x": 720, "y": 100 },
+    { "id": "read2", "type": "port", "role": "sink", "label": "Read model B", "icon": "table", "tone": "success", "x": 720, "y": 260 }
+  ],
+  "edges": [
+    { "id": "e1", "from": "cmd", "to": "agg" },
+    { "id": "e2", "from": "agg", "to": "log" },
+    { "id": "e3", "from": "log", "to": "proj1" },
+    { "id": "e4", "from": "log", "to": "proj2" },
+    { "id": "e5", "from": "proj1", "to": "read1" },
+    { "id": "e6", "from": "proj2", "to": "read2" }
+  ],
+  "sources": [{ "edge": "e1", "interval": 3000, "burst": { "count": 2, "spacing": 100 } }]
+}

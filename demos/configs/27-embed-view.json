@@ -1,0 +1,17 @@
+{
+  "title": "Pipeline (view-only)",
+  "viewport": { "height": 280, "padding": 40 },
+  "interaction": { "nodeDrag": false, "nodeSelect": false },
+  "controls": { "toolbar": false, "title": false },
+  "metrics": { "nodeDrawer": false, "globalDrawer": false, "nodePanel": false, "systemPanel": false },
+  "nodes": [
+    { "id": "a", "type": "port", "role": "source", "shape": "circle", "icon": "log-in", "x": 100, "y": 140 },
+    { "id": "b", "type": "process", "label": "Process", "icon": "cog", "duration": 700, "x": 280, "y": 140 },
+    { "id": "c", "type": "port", "role": "terminal", "label": "Out", "icon": "log-out", "tone": "success", "x": 460, "y": 140 }
+  ],
+  "edges": [
+    { "id": "ab", "from": "a", "to": "b" },
+    { "id": "bc", "from": "b", "to": "c", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "ab", "interval": 2400 }]
+}

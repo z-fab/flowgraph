@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLP training — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">26 — MLP training</span></nav>
+  <div class="demo-wrap">
+    <h1>MLP — forward pass &amp; backpropagation</h1>
+    <p class="lead">Tokens roxos fluem à frente (Input → FC → ReLU → … → Softmax). Após o forward, gradientes laranja percorrem o caminho inverso via arestas tracejadas (∂L/∂W).</p>
+    <div class="demo-tags"><span class="demo-tag ml">redes neurais</span><span class="demo-tag">forward</span><span class="demo-tag">backprop</span></div>
+    <div id="demo"></div>
+    <p class="demo-note">Duas camadas ocultas (FC+ReLU). Gradientes disparam em cada aresta <code>g*</code> com <code>delay</code> escalonado após o forward.</p>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/26-mlp-backprop.json');
+  </script>
+</body>
+</html>

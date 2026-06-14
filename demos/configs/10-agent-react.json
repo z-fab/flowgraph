@@ -1,0 +1,19 @@
+{
+  "title": "ReAct loop",
+  "viewport": { "height": 400, "padding": 55 },
+  "nodes": [
+    { "id": "user", "type": "port", "role": "source", "label": "User", "shape": "circle", "icon": "user", "x": 80, "y": 200 },
+    { "id": "orch", "type": "process", "label": "Orchestrator", "icon": "bot", "duration": 600, "x": 230, "y": 200 },
+    { "id": "llm", "type": "process", "label": "LLM", "icon": "brain", "duration": 1500, "x": 400, "y": 120, "tone": "primary" },
+    { "id": "tool", "type": "process", "label": "Tool", "icon": "wrench", "duration": 900, "x": 400, "y": 280, "tone": "warning" },
+    { "id": "stream", "type": "port", "role": "terminal", "label": "Stream out", "icon": "radio", "tone": "success", "x": 580, "y": 200 }
+  ],
+  "edges": [
+    { "id": "u", "from": "user", "to": "orch" },
+    { "id": "ol", "from": "orch", "to": "llm", "label": { "text": "think" } },
+    { "id": "ot", "from": "orch", "to": "tool", "label": { "text": "act" }, "stroke": { "dash": "dash", "color": "warning" } },
+    { "id": "tl", "from": "tool", "to": "llm", "routing": "loopback", "stroke": { "color": "warning", "dash": "dash" } },
+    { "id": "ls", "from": "llm", "to": "stream", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "u", "interval": 5500 }]
+}

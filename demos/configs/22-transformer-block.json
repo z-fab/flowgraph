@@ -1,0 +1,23 @@
+{
+  "title": "Decoder layer",
+  "viewport": { "height": 400, "padding": 60 },
+  "tokens": { "color": "#7C3AED", "size": 5, "speed": 75 },
+  "nodes": [
+    { "id": "embed", "type": "port", "role": "source", "shape": "circle", "icon": "binary", "x": 80, "y": 200 },
+    { "id": "mha", "type": "process", "label": "Multi-Head Attn", "icon": "git-branch", "duration": 1400, "x": 230, "y": 200 },
+    { "id": "norm1", "type": "process", "label": "Add+Norm", "icon": "plus", "duration": 250, "x": 390, "y": 200 },
+    { "id": "ffn", "type": "process", "label": "FFN", "icon": "workflow", "duration": 1100, "x": 530, "y": 200 },
+    { "id": "norm2", "type": "process", "label": "Add+Norm", "icon": "plus", "duration": 250, "retry": { "backEdge": "loop", "maxRetries": 3 }, "x": 670, "y": 200 },
+    { "id": "lm", "type": "port", "role": "terminal", "label": "LM head", "icon": "text", "tone": "success", "x": 670, "y": 340 }
+  ],
+  "edges": [
+    { "id": "e0", "from": "embed", "to": "mha", "label": { "text": "tokens" } },
+    { "id": "e1", "from": "mha", "to": "norm1", "label": { "text": "attn" } },
+    { "id": "e2", "from": "norm1", "to": "ffn" },
+    { "id": "e3", "from": "ffn", "to": "norm2" },
+    { "id": "e4", "from": "norm2", "to": "lm", "label": { "text": "logit" } },
+    { "id": "loop", "from": "norm2", "to": "mha", "routing": "loopback", "stroke": { "dash": "dash", "color": "primary" },
+      "label": { "text": "next token" } }
+  ],
+  "sources": [{ "edge": "e0", "interval": 5500, "burst": { "count": 4, "spacing": 50 } }]
+}

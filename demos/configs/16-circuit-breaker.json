@@ -1,0 +1,25 @@
+{
+  "title": "Circuit breaker",
+  "viewport": {
+    "height": 360,
+    "padding": 50,
+    "background": { "color": "#FAFAF8", "pattern": "grid", "patternSize": 20 }
+  },
+  "controls": { "layout": true },
+  "interaction": { "nodeDrag": true },
+  "tokens": { "color": "#7C3AED", "speed": 100 },
+  "nodes": [
+    { "id": "client", "type": "port", "role": "source", "label": "Client", "icon": "user", "x": 90, "y": 180 },
+    { "id": "breaker", "type": "process", "label": "Circuit Breaker", "icon": "unplug", "duration": 400,
+      "circuit": { "acceptEdge": "ok", "fallbackEdge": "fb", "failureRate": 0.35, "failureThreshold": 4, "recoveryMs": 6000 },
+      "pillTop": [{ "text": "closed", "tone": "success" }], "x": 270, "y": 180 },
+    { "id": "service", "type": "process", "label": "Downstream", "icon": "server", "tone": "success", "duration": 600, "x": 470, "y": 100 },
+    { "id": "fallback", "type": "process", "label": "Fallback cache", "icon": "archive", "tone": "warning", "duration": 300, "x": 470, "y": 260 }
+  ],
+  "edges": [
+    { "id": "c1", "from": "client", "to": "breaker" },
+    { "id": "ok", "from": "breaker", "to": "service", "label": { "text": "closed" }, "stroke": { "color": "success" } },
+    { "id": "fb", "from": "breaker", "to": "fallback", "label": { "text": "open" }, "stroke": { "dash": "dash", "color": "warning" } }
+  ],
+  "sources": [{ "edge": "c1", "interval": 1800 }]
+}

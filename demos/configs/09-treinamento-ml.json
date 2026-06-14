@@ -1,0 +1,16 @@
+{
+  "title": "Train → register",
+  "viewport": { "height": 300, "padding": 50 },
+  "nodes": [
+    { "id": "data", "type": "port", "role": "source", "label": "Dataset", "shape": "circle", "icon": "table", "x": 80, "y": 150 },
+    { "id": "train", "type": "process", "label": "Train", "icon": "graduation-cap", "duration": 2000, "x": 240, "y": 150, "tone": "warning" },
+    { "id": "val", "type": "process", "label": "Validate", "icon": "chart-line", "duration": 800, "x": 400, "y": 150 },
+    { "id": "registry", "type": "port", "role": "terminal", "label": "Registry", "icon": "package", "tone": "success", "x": 560, "y": 150 }
+  ],
+  "edges": [
+    { "id": "e1", "from": "data", "to": "train" },
+    { "id": "e2", "from": "train", "to": "val" },
+    { "id": "e3", "from": "val", "to": "registry", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "e1", "interval": 6000 }]
+}

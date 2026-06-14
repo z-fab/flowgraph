@@ -1,0 +1,16 @@
+{
+  "title": "ETL pipeline",
+  "viewport": { "height": 300, "padding": 50 },
+  "nodes": [
+    { "id": "src", "type": "port", "role": "source", "label": "Ingest", "shape": "circle", "icon": "download", "x": 80, "y": 150 },
+    { "id": "transform", "type": "process", "label": "Transform", "icon": "shuffle", "duration": 1000, "x": 240, "y": 150 },
+    { "id": "validate", "type": "process", "label": "Validate", "icon": "shield-check", "duration": 600, "x": 400, "y": 150, "tone": "warning" },
+    { "id": "dw", "type": "port", "role": "sink", "label": "Warehouse", "icon": "database", "tone": "success", "x": 560, "y": 150, "showReceived": true }
+  ],
+  "edges": [
+    { "id": "e1", "from": "src", "to": "transform", "label": { "text": "raw" } },
+    { "id": "e2", "from": "transform", "to": "validate", "label": { "text": "clean" } },
+    { "id": "e3", "from": "validate", "to": "dw", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "e1", "interval": 3500, "burst": { "count": 2, "spacing": 80 } }]
+}

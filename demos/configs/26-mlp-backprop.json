@@ -1,0 +1,53 @@
+{
+  "title": "MLP — forward & backprop",
+  "viewport": { "height": 420, "padding": 55 },
+  "tokens": { "color": "#7C3AED", "shape": "roundedRect", "size": 6, "speed": 95 },
+  "nodes": [
+    { "id": "input", "type": "port", "role": "source", "shape": "circle", "icon": "binary", "x": 70, "y": 170,
+      "pillTop": [{ "text": "x", "tone": "primary" }] },
+    { "id": "fc1", "type": "process", "label": "FC₁", "icon": "grid-3x3", "duration": 480, "x": 190, "y": 170,
+      "pillTop": [{ "text": "W₁", "tone": "primary" }] },
+    { "id": "relu1", "type": "process", "shape": "circle", "icon": "activity", "duration": 180, "x": 300, "y": 170,
+      "pillTop": [{ "text": "ReLU", "tone": "success" }] },
+    { "id": "fc2", "type": "process", "label": "FC₂", "icon": "grid-3x3", "duration": 480, "x": 410, "y": 170,
+      "pillTop": [{ "text": "W₂", "tone": "primary" }] },
+    { "id": "relu2", "type": "process", "shape": "circle", "icon": "activity", "duration": 180, "x": 520, "y": 170,
+      "pillTop": [{ "text": "ReLU", "tone": "success" }] },
+    { "id": "fc3", "type": "process", "label": "FC₃", "icon": "grid-3x3", "duration": 480, "x": 630, "y": 170,
+      "pillTop": [{ "text": "W₃", "tone": "primary" }], "emit": { "mode": "map", "map": { "e5": 1 } } },
+    { "id": "output", "type": "port", "role": "terminal", "label": "Softmax", "icon": "bar-chart-2", "tone": "success", "x": 760, "y": 170,
+      "pillTop": [{ "text": "ŷ", "tone": "success" }] }
+  ],
+  "edges": [
+    { "id": "e0", "from": "input", "to": "fc1", "label": { "text": "forward" } },
+    { "id": "e1", "from": "fc1", "to": "relu1" },
+    { "id": "e2", "from": "relu1", "to": "fc2" },
+    { "id": "e3", "from": "fc2", "to": "relu2" },
+    { "id": "e4", "from": "relu2", "to": "fc3" },
+    { "id": "e5", "from": "fc3", "to": "output", "label": { "text": "logits" }, "stroke": { "color": "success" } },
+    { "id": "g1", "from": "output", "to": "fc3", "routing": "loopback", "loopSide": "below",
+      "label": { "text": "∂L/∂z₃" }, "stroke": { "color": "warning", "dash": "dash" },
+      "token": { "color": "#D97706", "shape": "rect", "size": 5 } },
+    { "id": "g2", "from": "fc3", "to": "relu2", "routing": "loopback", "loopSide": "below",
+      "label": { "text": "∂L/∂h₂" }, "stroke": { "color": "warning", "dash": "dash" },
+      "token": { "color": "#D97706", "shape": "rect" } },
+    { "id": "g3", "from": "relu2", "to": "fc2", "routing": "loopback", "loopSide": "below",
+      "stroke": { "color": "warning", "dash": "dash" }, "token": { "color": "#D97706", "shape": "rect" } },
+    { "id": "g4", "from": "fc2", "to": "relu1", "routing": "loopback", "loopSide": "below",
+      "stroke": { "color": "warning", "dash": "dash" }, "token": { "color": "#D97706", "shape": "rect" } },
+    { "id": "g5", "from": "relu1", "to": "fc1", "routing": "loopback", "loopSide": "below",
+      "stroke": { "color": "warning", "dash": "dash" }, "token": { "color": "#D97706", "shape": "rect" } },
+    { "id": "g6", "from": "fc1", "to": "input", "routing": "loopback", "loopSide": "below",
+      "label": { "text": "∂L/∂x" }, "stroke": { "color": "warning", "dash": "dash" },
+      "token": { "color": "#D97706", "shape": "rect" } }
+  ],
+  "sources": [
+    { "id": "fwd", "edge": "e0", "interval": 12000 },
+    { "id": "b1", "edge": "g1", "interval": 12000, "delay": 3000, "token": { "color": "#D97706", "shape": "rect", "size": 5 } },
+    { "id": "b2", "edge": "g2", "interval": 12000, "delay": 3600, "token": { "color": "#D97706", "shape": "rect" } },
+    { "id": "b3", "edge": "g3", "interval": 12000, "delay": 4200, "token": { "color": "#D97706", "shape": "rect" } },
+    { "id": "b4", "edge": "g4", "interval": 12000, "delay": 4800, "token": { "color": "#D97706", "shape": "rect" } },
+    { "id": "b5", "edge": "g5", "interval": 12000, "delay": 5400, "token": { "color": "#D97706", "shape": "rect" } },
+    { "id": "b6", "edge": "g6", "interval": 12000, "delay": 6000, "token": { "color": "#D97706", "shape": "rect" } }
+  ]
+}

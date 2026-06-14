@@ -1,0 +1,21 @@
+{
+  "title": "Burst & speed",
+  "viewport": { "height": 300, "padding": 50 },
+  "tokens": { "color": "#7C3AED", "speed": 120, "size": 7 },
+  "nodes": [
+    { "id": "src", "type": "port", "role": "source", "shape": "circle", "icon": "radio", "x": 100, "y": 150 },
+    { "id": "fast", "type": "process", "label": "Fast lane", "icon": "zap", "duration": 300, "x": 300, "y": 90, "tone": "success" },
+    { "id": "slow", "type": "process", "label": "Slow lane", "icon": "hourglass", "duration": 1400, "x": 300, "y": 210, "tone": "warning" },
+    { "id": "out", "type": "port", "role": "terminal", "label": "Merge", "icon": "merge", "x": 520, "y": 150, "tone": "primary" }
+  ],
+  "edges": [
+    { "id": "a", "from": "src", "to": "fast", "speed": 180 },
+    { "id": "b", "from": "src", "to": "slow", "speed": 60, "stroke": { "dash": "dash", "color": "warning" } },
+    { "id": "c", "from": "fast", "to": "out", "speed": 150 },
+    { "id": "d", "from": "slow", "to": "out", "speed": 50 }
+  ],
+  "sources": [
+    { "edge": "a", "interval": 1800, "burst": { "count": 3, "spacing": 70 }, "token": { "color": "#3D6B52" } },
+    { "edge": "b", "interval": 2400, "burst": { "count": 2, "spacing": 120 }, "token": { "color": "#D97706" } }
+  ]
+}

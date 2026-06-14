@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowgraph.dev/schema/flowgraph-v1.json",
+  "title": "FlowGraph v1",
+  "type": "object",
+  "required": ["nodes", "edges"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "title": { "type": "string" },
+    "viewport": {
+      "type": "object",
+      "properties": {
+        "width": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+        "height": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+        "padding": { "type": "number" },
+        "background": {
+          "type": "object",
+          "properties": {
+            "color": { "type": "string" },
+            "pattern": { "enum": ["none", "dots", "grid", "cross"] },
+            "patternColor": { "type": "string" },
+            "patternSize": { "type": "number" },
+            "patternOpacity": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "properties": {
+        "shape": { "enum": ["circle", "rect", "roundedRect"] },
+        "size": { "type": "number" },
+        "speed": { "type": "number" },
+        "color": { "type": "string" }
+      }
+    },
+    "randomness": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "duration": { "type": "object", "properties": { "jitter": { "type": "number" } } },
+        "speed": { "type": "object", "properties": { "jitter": { "type": "number" } } },
+        "sources": { "type": "object", "properties": { "jitter": { "type": "number" } } }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "properties": {
+        "toolbar": { "type": "boolean", "description": "Show bottom control bar (default true)" },
+        "title": { "type": "boolean", "description": "Show title header in chrome (default true when title set)" },
+        "playPause": { "type": "boolean" },
+        "zoomReset": { "type": "boolean" },
+        "metricsDrawer": { "type": "boolean" },
+        "reset": { "type": "boolean" },
+        "layout": { "type": "boolean", "description": "Show auto-layout toolbar button" }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "properties": {
+        "nodeDrag": { "type": "boolean", "description": "Allow dragging nodes to reposition" },
+        "nodeSelect": { "type": "boolean", "description": "Allow click to select node and open drawer" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "nodePanel": { "type": "boolean" },
+        "nodeDrawer": { "type": "boolean" },
+        "systemPanel": { "type": "boolean" },
+        "globalDrawer": { "type": "boolean" },
+        "charts": { "type": "boolean" },
+        "windowSec": { "type": "number" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "engine": { "enum": ["layered", "dagre"] },
+        "direction": { "enum": ["LR", "TB"] },
+        "rankGap": { "type": "number" },
+        "nodeGap": { "type": "number" }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "edges": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/edge" }
+    },
+    "sources": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "pill": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "icon": { "type": "string" },
+        "tone": { "enum": ["primary", "success", "warning", "danger"] },
+        "animated": { "type": "boolean" },
+        "progress": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "admission": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["queue", "slot", "batch"] },
+        "max": { "type": ["number", "null"] },
+        "step": { "type": "number" },
+        "rejectEdge": { "type": ["string", "null"] }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "properties": {
+        "count": { "type": "number" },
+        "from": {
+          "oneOf": [
+            { "enum": ["any", "all-edges"] },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        }
+      }
+    },
+    "emit": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["all", "map", "round-robin", "weighted", "excludeReject"] },
+        "map": { "type": "object", "additionalProperties": { "type": "number" } },
+        "count": { "type": "number" },
+        "token": { "type": "object" }
+      }
+    },
+    "retry": {
+      "type": "object",
+      "properties": {
+        "backEdge": { "type": "string" },
+        "maxRetries": { "type": "number" }
+      }
+    },
+    "circuit": {
+      "type": "object",
+      "properties": {
+        "acceptEdge": { "type": "string" },
+        "fallbackEdge": { "type": "string" },
+        "failureRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "failureThreshold": { "type": "number" },
+        "recoveryMs": { "type": "number" }
+      }
+    },
+    "nodeBase": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "enum": ["port", "process"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "label": { "type": "string" },
+        "icon": { "type": "string" },
+        "tone": { "enum": ["primary", "success", "warning", "danger"] },
+        "shape": { "enum": ["circle", "rect"] },
+        "duration": { "type": "number" },
+        "pillTop": {
+          "oneOf": [
+            { "$ref": "#/$defs/pill" },
+            { "type": "array", "items": { "$ref": "#/$defs/pill" } }
+          ]
+        },
+        "showReceived": { "type": "boolean" },
+        "admission": { "$ref": "#/$defs/admission" },
+        "gate": { "$ref": "#/$defs/gate" },
+        "emit": { "$ref": "#/$defs/emit" },
+        "retry": { "$ref": "#/$defs/retry" },
+        "circuit": { "$ref": "#/$defs/circuit" }
+      }
+    },
+    "node": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/nodeBase" },
+            {
+              "properties": {
+                "type": { "const": "port" },
+                "role": { "enum": ["source", "sink", "terminal"] }
+              },
+              "required": ["role"]
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/nodeBase" },
+            { "properties": { "type": { "const": "process" } } }
+          ]
+        }
+      ]
+    },
+    "edge": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "id": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "weight": { "type": "number" },
+        "speed": { "type": "number" },
+        "routing": { "enum": ["bezier", "straight", "loopback"] },
+        "animated": { "type": "boolean" },
+        "stroke": {
+          "type": "object",
+          "properties": {
+            "color": { "type": "string" },
+            "width": { "type": "number" },
+            "dash": { "oneOf": [{ "type": "string" }, { "enum": ["solid", "dash", "dot"] }] }
+          }
+        },
+        "label": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "properties": {
+                "text": { "type": "string" },
+                "icon": { "type": "string" },
+                "animated": { "type": "boolean" },
+                "progress": { "type": "number" }
+              }
+            }
+          ]
+        },
+        "token": { "type": "object" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["edge"],
+      "properties": {
+        "id": { "type": "string" },
+        "edge": { "type": "string" },
+        "interval": { "type": "number" },
+        "delay": { "type": "number", "description": "Ms before first spawn (e.g. backprop after forward)" },
+        "jitter": { "type": "number" },
+        "burst": {
+          "type": "object",
+          "properties": {
+            "count": { "type": "number" },
+            "spacing": { "type": "number" }
+          }
+        },
+        "token": { "type": "object" },
+        "enabled": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "title": "capacity=2",
+  "viewport": {
+    "height": 360,
+    "padding": 55,
+    "background": { "color": "#FAFAF8", "pattern": "dots", "patternColor": "#E8E4DC", "patternSize": 18 }
+  },
+  "tokens": { "color": "#7C3AED", "speed": 100, "size": 6 },
+  "nodes": [
+    { "id": "client", "type": "port", "role": "source", "shape": "circle", "icon": "users", "x": 80, "y": 180 },
+    { "id": "sem", "type": "process", "label": "Semaphore", "icon": "shield", "duration": 2200,
+      "admission": { "mode": "slot", "max": 2, "rejectEdge": "reject" },
+      "emit": { "mode": "map", "map": { "accept": 1 } },
+      "pillTop": [{ "text": "max 2", "tone": "warning" }], "x": 260, "y": 180 },
+    { "id": "ok", "type": "port", "role": "sink", "label": "Accepted", "icon": "check", "tone": "success", "x": 460, "y": 120 },
+    { "id": "rej", "type": "port", "role": "sink", "shape": "circle", "icon": "ban", "tone": "danger", "x": 460, "y": 260 }
+  ],
+  "edges": [
+    { "id": "in", "from": "client", "to": "sem" },
+    { "id": "accept", "from": "sem", "to": "ok", "stroke": { "color": "success" }, "label": { "text": "200 OK" } },
+    { "id": "reject", "from": "sem", "to": "rej", "stroke": { "color": "danger", "dash": "dash" },
+      "label": { "text": "429" }, "token": { "shape": "rect", "color": "danger" } }
+  ],
+  "sources": [{ "edge": "in", "interval": 700, "burst": { "count": 2, "spacing": 80 } }]
+}

@@ -1,0 +1,20 @@
+{
+  "title": "POST /predict",
+  "viewport": { "height": 300, "padding": 50 },
+  "tokens": { "color": "#7C3AED", "speed": 95, "size": 7 },
+  "randomness": { "enabled": true },
+  "nodes": [
+    { "id": "cliente", "type": "port", "role": "source", "label": "Cliente", "icon": "user", "x": 70, "y": 150 },
+    { "id": "gateway", "type": "process", "label": "API Gateway", "icon": "server", "duration": 350, "x": 210, "y": 150 },
+    { "id": "features", "type": "process", "label": "Feature Store", "icon": "database", "duration": 1400, "x": 370, "y": 150 },
+    { "id": "server", "type": "process", "label": "Model Server", "icon": "cpu", "tone": "warning", "duration": 1800, "x": 530, "y": 150 },
+    { "id": "resp", "type": "port", "role": "terminal", "label": "Resposta", "icon": "circle-check", "tone": "success", "x": 690, "y": 150 }
+  ],
+  "edges": [
+    { "id": "e1", "from": "cliente", "to": "gateway" },
+    { "id": "e2", "from": "gateway", "to": "features" },
+    { "id": "e3", "from": "features", "to": "server" },
+    { "id": "e4", "from": "server", "to": "resp", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "e1", "interval": 5000, "jitter": 500 }]
+}

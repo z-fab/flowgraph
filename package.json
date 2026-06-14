@@ -1,0 +1,56 @@
+{
+  "name": "flowgraph",
+  "version": "1.0.0",
+  "description": "Lightweight animated flow diagrams with token simulation — port + process nodes, JSON config",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/z-fab/flowgraph.git"
+  },
+  "homepage": "https://github.com/z-fab/flowgraph#readme",
+  "bugs": {
+    "url": "https://github.com/z-fab/flowgraph/issues"
+  },
+  "files": [
+    "dist",
+    "flowgraph.css",
+    "schema",
+    "docs",
+    "skill",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/flowgraph.js",
+  "module": "./dist/flowgraph.js",
+  "exports": {
+    ".": {
+      "import": "./dist/flowgraph.js",
+      "default": "./dist/flowgraph.js"
+    },
+    "./style.css": "./flowgraph.css"
+  },
+  "sideEffects": [
+    "flowgraph.css"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test tests/*.test.js",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "flowchart",
+    "diagram",
+    "animation",
+    "simulation",
+    "svg",
+    "ml-serving",
+    "visualization"
+  ],
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "^3.0.0"
+  }
+}

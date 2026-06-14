@@ -1,0 +1,19 @@
+{
+  "title": "batch_size=8",
+  "viewport": { "height": 300, "padding": 55 },
+  "tokens": { "color": "#7C3AED", "size": 6, "speed": 110 },
+  "nodes": [
+    { "id": "req", "type": "port", "role": "source", "shape": "circle", "icon": "inbox", "x": 90, "y": 150 },
+    { "id": "batch", "type": "process", "label": "Batcher", "icon": "layers",
+      "admission": { "mode": "batch", "max": 8, "step": 1 }, "duration": 200,
+      "pillTop": [{ "text": "μ-batch", "tone": "primary" }], "x": 280, "y": 150 },
+    { "id": "gpu", "type": "process", "label": "GPU infer", "icon": "cpu", "tone": "warning", "duration": 1800, "x": 470, "y": 150 },
+    { "id": "out", "type": "port", "role": "terminal", "label": "Responses", "icon": "send", "tone": "success", "x": 650, "y": 150 }
+  ],
+  "edges": [
+    { "id": "e1", "from": "req", "to": "batch", "label": { "text": "req" } },
+    { "id": "e2", "from": "batch", "to": "gpu", "label": { "text": "batch" } },
+    { "id": "e3", "from": "gpu", "to": "out", "stroke": { "color": "success" } }
+  ],
+  "sources": [{ "edge": "e1", "interval": 450, "jitter": 150 }]
+}

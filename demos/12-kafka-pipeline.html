@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kafka pipeline — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">12 — Kafka</span></nav>
+  <div class="demo-wrap">
+    <h1>Kafka pipeline</h1>
+    <p class="lead">Producer publica eventos; consumidores independentes processam e escrevem em sinks distintos.</p>
+    <div class="demo-tags"><span class="demo-tag data">dados</span><span class="demo-tag">streaming</span></div>
+    <div id="demo"></div>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/12-kafka-pipeline.json');
+  </script>
+</body>
+</html>

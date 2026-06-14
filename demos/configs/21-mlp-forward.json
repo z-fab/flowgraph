@@ -1,0 +1,23 @@
+{
+  "title": "Forward + residual",
+  "viewport": { "height": 380, "padding": 55 },
+  "tokens": { "color": "#7C3AED", "shape": "roundedRect", "size": 6, "speed": 90 },
+  "nodes": [
+    { "id": "input", "type": "port", "role": "source", "shape": "circle", "icon": "binary", "x": 70, "y": 190 },
+    { "id": "lin1", "type": "process", "label": "Linear", "icon": "grid-3x3", "duration": 600, "x": 200, "y": 190,
+      "pillTop": [{ "text": "W1", "tone": "primary" }] },
+    { "id": "relu", "type": "process", "shape": "circle", "icon": "activity", "duration": 300, "x": 340, "y": 190 },
+    { "id": "lin2", "type": "process", "label": "Linear", "icon": "grid-3x3", "duration": 600, "x": 480, "y": 190,
+      "pillTop": [{ "text": "W2" }] },
+    { "id": "softmax", "type": "port", "role": "terminal", "label": "Softmax", "icon": "bar-chart-2", "tone": "success", "x": 620, "y": 190 }
+  ],
+  "edges": [
+    { "id": "e0", "from": "input", "to": "lin1", "label": { "text": "x" } },
+    { "id": "e1", "from": "lin1", "to": "relu", "label": { "text": "Wx+b" } },
+    { "id": "e2", "from": "relu", "to": "lin2" },
+    { "id": "e3", "from": "lin2", "to": "softmax", "label": { "text": "logits" } },
+    { "id": "skip", "from": "lin1", "to": "lin2", "routing": "loopback", "stroke": { "dash": "dash", "color": "success", "width": 1.5 },
+      "label": { "text": "skip" } }
+  ],
+  "sources": [{ "edge": "e0", "interval": 4000 }]
+}

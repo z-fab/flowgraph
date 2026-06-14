@@ -1,0 +1,22 @@
+{
+  "title": "Smart routing",
+  "viewport": { "height": 400, "padding": 55 },
+  "tokens": { "color": "#7C3AED", "speed": 90, "size": 6 },
+  "nodes": [
+    { "id": "users", "type": "port", "role": "source", "shape": "circle", "icon": "users", "x": 80, "y": 200 },
+    { "id": "router", "type": "process", "label": "Router", "icon": "git-branch", "duration": 450, "emit": { "mode": "weighted" }, "x": 240, "y": 200 },
+    { "id": "slm", "type": "process", "label": "SLM 3B", "icon": "zap", "tone": "success", "duration": 500, "shape": "circle",
+      "pillTop": [{ "text": "fast", "tone": "success" }], "x": 440, "y": 100 },
+    { "id": "llm", "type": "process", "label": "LLM 70B", "icon": "brain", "tone": "warning", "duration": 2000,
+      "pillTop": [{ "text": "quality", "tone": "warning" }], "x": 440, "y": 300 },
+    { "id": "metrics", "type": "port", "role": "sink", "label": "Observability", "icon": "activity", "x": 620, "y": 200, "showReceived": true }
+  ],
+  "edges": [
+    { "id": "ur", "from": "users", "to": "router" },
+    { "id": "rs", "from": "router", "to": "slm", "weight": 6, "label": { "text": "simple" }, "stroke": { "color": "success" } },
+    { "id": "rl", "from": "router", "to": "llm", "weight": 4, "label": { "text": "complex" }, "stroke": { "color": "warning" } },
+    { "id": "sm", "from": "slm", "to": "metrics", "stroke": { "dash": "dash" } },
+    { "id": "lm", "from": "llm", "to": "metrics", "stroke": { "dash": "dash" } }
+  ],
+  "sources": [{ "edge": "ur", "interval": 2800, "jitter": 300 }]
+}

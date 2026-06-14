@@ -1,0 +1,26 @@
+{
+  "title": "Batch vs online",
+  "viewport": { "height": 380, "padding": 55 },
+  "nodes": [
+    { "id": "cron", "type": "port", "role": "source", "label": "Scheduler", "shape": "circle", "icon": "clock", "x": 80, "y": 100 },
+    { "id": "batch", "type": "process", "label": "Batch job", "icon": "layers",
+      "admission": { "mode": "batch", "max": 5, "step": 1 }, "duration": 200, "x": 260, "y": 100,
+      "pillTop": [{ "text": "batch", "tone": "primary" }] },
+    { "id": "dw", "type": "port", "role": "sink", "label": "Warehouse", "icon": "database", "tone": "success", "x": 460, "y": 100 },
+    { "id": "user", "type": "port", "role": "source", "label": "User", "shape": "circle", "icon": "user", "x": 80, "y": 260 },
+    { "id": "api", "type": "process", "label": "Online API", "icon": "zap", "duration": 400, "x": 260, "y": 260 },
+    { "id": "model", "type": "process", "label": "Model", "icon": "cpu", "duration": 900, "x": 400, "y": 260, "tone": "warning" },
+    { "id": "resp", "type": "port", "role": "terminal", "label": "Response", "icon": "send", "tone": "success", "x": 540, "y": 260 }
+  ],
+  "edges": [
+    { "id": "b1", "from": "cron", "to": "batch" },
+    { "id": "b2", "from": "batch", "to": "dw", "stroke": { "color": "primary", "dash": "dash" } },
+    { "id": "o1", "from": "user", "to": "api" },
+    { "id": "o2", "from": "api", "to": "model" },
+    { "id": "o3", "from": "model", "to": "resp", "stroke": { "color": "success" } }
+  ],
+  "sources": [
+    { "edge": "b1", "interval": 4000, "token": { "color": "#5B21B6" } },
+    { "edge": "o1", "interval": 2200, "jitter": 300 }
+  ]
+}
