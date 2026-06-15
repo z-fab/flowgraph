@@ -19,6 +19,7 @@
     "docs",
     "skill",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "main": "./dist/flowgraph.js",

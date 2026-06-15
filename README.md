@@ -168,3 +168,7 @@ The **[skill/](skill/)** folder contains a Cursor/Claude-compatible skill that t
 ## License
 
 [MIT](LICENSE) © Fabrício
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
