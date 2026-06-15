@@ -20,148 +20,17 @@ var FlowGraph = (() => {
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // src/admission.js
-  function admissionMode(node) {
-    var _a;
-    return ((_a = node.admission) == null ? void 0 : _a.mode) || "queue";
-  }
-  function admissionMax(node) {
-    var _a, _b;
-    return (_b = (_a = node.admission) == null ? void 0 : _a.max) != null ? _b : null;
-  }
-  function hasCircuit(node) {
-    return node.circuit != null;
-  }
-  function hasRetry(node) {
-    var _a;
-    return ((_a = node.retry) == null ? void 0 : _a.backEdge) != null;
-  }
-  function isJoinGate(node) {
-    var _a;
-    const from = (_a = node.gate) == null ? void 0 : _a.from;
-    return from === "all-edges" || Array.isArray(from);
-  }
-  function tryAdmit(node, state, inEdgeId) {
-    var _a, _b;
-    const mode = admissionMode(node);
-    const max = admissionMax(node);
-    if (mode === "slot") {
-      const cap = max != null ? max : 1;
-      if (state.slots >= cap) return { accepted: false, overflow: true };
-      state.slots += 1;
-      state.buffer += 1;
-      state.bufferByEdge[inEdgeId] = (state.bufferByEdge[inEdgeId] || 0) + 1;
-      return { accepted: true, slots: state.slots };
-    }
-    if (mode === "batch") {
-      const batchMax = max != null ? max : 10;
-      const step = (_b = (_a = node.admission) == null ? void 0 : _a.step) != null ? _b : 1;
-      state.fill = Math.min(batchMax, state.fill + step);
-      state.flushing = false;
-      if (state.fill < batchMax) {
-        return { accepted: false, accumulating: true };
-      }
-      state.fill = 0;
-      state.buffer += 1;
-      state.flushing = true;
-      return { accepted: true, flush: true };
-    }
-    const occ = state.buffer + (state.processing ? 1 : 0);
-    if (max != null && occ >= max) return { accepted: false, overflow: true };
-    state.buffer += 1;
-    state.bufferByEdge[inEdgeId] = (state.bufferByEdge[inEdgeId] || 0) + 1;
-    return { accepted: true };
-  }
-  function releaseSlot(state) {
-    state.slots = Math.max(0, state.slots - 1);
-  }
-  function estimateAdmissionPillHeight(node) {
-    var _a;
-    const mode = admissionMode(node);
+  // src/compose-pills.js
+  function estimateBottomPillHeight(node) {
+    const pills = node == null ? void 0 : node.pillBottom;
+    if (!(pills == null ? void 0 : pills.length)) return 0;
     const pillH = 18;
     const gap = 3;
     const pad = 5;
-    if (mode === "slot") return pad + pillH * 3 + gap * 2;
-    if (isJoinGate(node)) return pad + pillH * 2 + gap;
-    if (hasCircuit(node) || ((_a = node.admission) == null ? void 0 : _a.rejectEdge)) return pad + pillH * 2 + gap;
-    return pad + pillH;
-  }
-  var init_admission = __esm({
-    "src/admission.js"() {
-    }
-  });
-
-  // src/compose-pills.js
-  function buildPillsBottom(node, state, metrics = {}) {
-    var _a, _b, _c, _d, _e2;
-    if (!node || !state) return [];
-    const pills = [];
-    const rejects = (_b = (_a = metrics.rejects) != null ? _a : state.rejects) != null ? _b : 0;
-    if (node.type === "port") {
-      if (node.showReceived) pills.push({ text: String(state.received || 0) });
-      return pills;
-    }
-    const mode = admissionMode(node);
-    const rejectEdge = (_c = node.admission) == null ? void 0 : _c.rejectEdge;
-    if (mode === "slot") {
-      const cap = (_d = admissionMax(node)) != null ? _d : 1;
-      const slots = state.slots || 0;
-      let tone = null;
-      if (slots >= cap) tone = "danger";
-      else if (slots > 0) tone = "warning";
-      pills.push({ text: `${slots}/${cap}`, tone });
-      if (state.processing) pills.push({ icon: "\xB7\xB7\xB7", animated: true });
-      if (rejectEdge) {
-        pills.push({ icon: "circle-x", text: String(rejects), tone: rejects > 0 ? "danger" : null });
-      }
-      return pills;
-    }
-    if (mode === "batch") {
-      const max2 = (_e2 = admissionMax(node)) != null ? _e2 : 10;
-      if (state.flushing) pills.push({ text: "flush", animated: true });
-      else if (state.fill > 0) pills.push({ text: `${state.fill}/${max2}`, progress: state.fill / max2 });
-      if (state.processing) pills.push({ icon: "\xB7\xB7\xB7", animated: true });
-      return pills;
-    }
-    if (isJoinGate(node)) {
-      if (state.waiting) pills.push({ text: "waiting", tone: "warning" });
-      if (state.processing) pills.push({ icon: "\xB7\xB7\xB7", animated: true });
-      const gate = node.gate || { count: 1 };
-      if (Array.isArray(gate.from) && state.waiting) {
-        const ready = gate.from.filter((eid) => (state.bufferByEdge[eid] || 0) >= (gate.count || 1)).length;
-        pills.push({ text: `${ready}/${gate.from.length}`, tone: "primary" });
-      }
-      return pills;
-    }
-    if (hasRetry(node) && state.retries > 0) {
-      pills.push({ text: `retry ${state.retries}/${node.retry.maxRetries || 3}`, tone: "warning" });
-    }
-    if (hasCircuit(node)) {
-      const st2 = state.circuitState || "closed";
-      if (st2 !== "closed") {
-        pills.push({ text: st2.toUpperCase(), tone: st2 === "open" ? "danger" : "warning" });
-      }
-      pills.push({ icon: "circle-x", text: String(rejects), tone: rejects > 0 ? "danger" : null });
-    }
-    const max = admissionMax(node);
-    if (state.buffer > 0 || max != null) {
-      const occ = state.buffer + (state.processing ? 1 : 0);
-      const text = max != null ? `${occ}/${max}` : `queue ${state.buffer}`;
-      pills.push({ text, tone: state.buffer > 0 ? "warning" : null });
-    }
-    if (state.waiting) pills.push({ text: "waiting", tone: "warning" });
-    if (state.processing) pills.push({ icon: "\xB7\xB7\xB7", animated: true });
-    if (rejectEdge && !hasCircuit(node)) {
-      pills.push({ icon: "circle-x", text: String(rejects), tone: rejects > 0 ? "danger" : null });
-    }
-    return pills;
-  }
-  function estimateBottomPillHeight(node) {
-    return estimateAdmissionPillHeight(node);
+    return pad + pillH * pills.length + gap * Math.max(0, pills.length - 1);
   }
   var init_compose_pills = __esm({
     "src/compose-pills.js"() {
-      init_admission();
     }
   });
 
@@ -1936,6 +1805,320 @@ var FlowGraph = (() => {
     return nodes.some((n) => n.x == null || n.y == null);
   }
 
+  // src/flow-player.js
+  var STEP_KINDS = ["travel", "dwell", "parallel", "setPill", "setEffect", "wait", "focus", "narrate"];
+  function parseStep(raw, index) {
+    if (!raw || typeof raw !== "object") throw new Error(`FlowGraph: invalid step at index ${index}`);
+    const kind = STEP_KINDS.find((k2) => raw[k2] != null);
+    if (!kind) throw new Error(`FlowGraph: unknown step at index ${index}`);
+    const data = raw[kind];
+    if (kind === "parallel") {
+      if (!Array.isArray(data)) throw new Error(`FlowGraph: parallel step at ${index} must be an array`);
+      return {
+        kind,
+        parallel: data.map((s, i) => parseStep(s, index * 100 + i)),
+        title: raw.title || null,
+        description: raw.description || null
+      };
+    }
+    return {
+      kind,
+      ...data,
+      title: data.title || raw.title || null,
+      description: data.description || raw.description || null
+    };
+  }
+  function normalizeTrack(raw, index, defaults) {
+    var _a, _b, _c, _d;
+    const steps = (_a = raw.steps) == null ? void 0 : _a.map((s, i) => parseStep(s, i));
+    if (!(steps == null ? void 0 : steps.length)) throw new Error(`FlowGraph: track "${raw.id || index}" needs steps`);
+    return {
+      id: raw.id || `track-${index}`,
+      label: raw.label || raw.id || `Track ${index + 1}`,
+      steps,
+      loop: (_b = raw.loop) != null ? _b : defaults.loop,
+      playInterval: (_c = raw.playInterval) != null ? _c : defaults.playInterval,
+      offset: (_d = raw.offset) != null ? _d : 0
+    };
+  }
+  function normalizeScenario(raw) {
+    var _a, _b, _c, _d, _e2, _f, _g, _h;
+    const defaults = {
+      loop: raw.loop !== false,
+      playInterval: (_a = raw.playInterval) != null ? _a : 400,
+      defaultMode: raw.defaultMode || "play",
+      speed: (_b = raw.speed) != null ? _b : 1,
+      tracksPresentation: raw.tracksPresentation || "parallel",
+      narration: {
+        showOnCanvas: ((_c = raw.narration) == null ? void 0 : _c.showOnCanvas) === true,
+        position: ((_d = raw.narration) == null ? void 0 : _d.position) || "top-left",
+        maxWidth: (_f = (_e2 = raw.narration) == null ? void 0 : _e2.maxWidth) != null ? _f : 320
+      }
+    };
+    let tracks;
+    if ((_g = raw.tracks) == null ? void 0 : _g.length) {
+      tracks = raw.tracks.map((t, i) => normalizeTrack(t, i, defaults));
+    } else if ((_h = raw.steps) == null ? void 0 : _h.length) {
+      tracks = [normalizeTrack({ id: "main", label: "Principal", steps: raw.steps }, 0, defaults)];
+    } else {
+      throw new Error("FlowGraph: scenario.steps or scenario.tracks is required");
+    }
+    return { ...defaults, tracks, steps: tracks[0].steps };
+  }
+  var FlowPlayer = class {
+    constructor(track, scenario, hooks = {}) {
+      this.track = track;
+      this.scenario = scenario;
+      this.hooks = hooks;
+      this.stepIndex = 0;
+      this.playing = false;
+      this._playTimer = null;
+      this.atNodeId = null;
+      this.speed = 1;
+    }
+    get trackId() {
+      return this.track.id;
+    }
+    get steps() {
+      return this.track.steps;
+    }
+    peek() {
+      return this.steps[this.stepIndex] || null;
+    }
+    reset() {
+      this.stepIndex = 0;
+      this.atNodeId = null;
+      this.stopPlay();
+    }
+    stopPlay() {
+      this.playing = false;
+      if (this._playTimer) clearTimeout(this._playTimer);
+      this._playTimer = null;
+    }
+    startPlay(delayMs = 0) {
+      if (this.playing) return;
+      this.playing = true;
+      this._playTimer = setTimeout(() => this._scheduleNextPlay(), this._scaled(delayMs));
+    }
+    _scaled(ms) {
+      return Math.max(0, ms / (this.speed || 1));
+    }
+    _scheduleNextPlay() {
+      if (!this.playing) return;
+      this.runNext(false).then((step) => {
+        var _a, _b;
+        if (!this.playing) return;
+        if (!step) {
+          const canLoop = this.track.loop && !this._forceNoLoop;
+          if (canLoop) {
+            this.stepIndex = 0;
+            this._playTimer = setTimeout(
+              () => this._scheduleNextPlay(),
+              this._scaled(this.track.playInterval)
+            );
+          } else {
+            this.playing = false;
+            (_b = (_a = this.hooks).onTrackEnd) == null ? void 0 : _b.call(_a, this.trackId);
+          }
+          return;
+        }
+        const extra = step.kind === "wait" ? step.ms || 0 : this.track.playInterval;
+        this._playTimer = setTimeout(() => this._scheduleNextPlay(), this._scaled(extra));
+      });
+    }
+    async runNext(manual = false) {
+      var _a, _b, _c, _d;
+      if (this.stepIndex >= this.steps.length) {
+        const canLoop = this.track.loop && !this._forceNoLoop && !manual;
+        if (canLoop) {
+          this.stepIndex = 0;
+        } else {
+          if (!manual) (_b = (_a = this.hooks).onTrackEnd) == null ? void 0 : _b.call(_a, this.trackId);
+          return null;
+        }
+      }
+      const step = this.steps[this.stepIndex];
+      this.stepIndex += 1;
+      await this._execute(step, manual);
+      (_d = (_c = this.hooks).onStep) == null ? void 0 : _d.call(_c, step, this.trackId);
+      return step;
+    }
+    async runPrev() {
+      if (this.stepIndex <= 1) return null;
+      this.stepIndex -= 2;
+      return this.runNext(true);
+    }
+    async _execute(step, manual) {
+      var _a, _b, _c, _d;
+      const stepIndex = this.stepIndex - 1;
+      if (step.kind !== "parallel") {
+        (_b = (_a = this.hooks).onStepStart) == null ? void 0 : _b.call(_a, step, manual, this.trackId, { stepIndex, subIndex: -1 });
+      }
+      await this._executeCore(step, manual);
+      if (step.kind !== "parallel") {
+        this._emitNarration(step);
+        (_d = (_c = this.hooks).onStep) == null ? void 0 : _d.call(_c, step, this.trackId);
+      }
+    }
+    _emitNarration(step) {
+      var _a, _b, _c, _d;
+      if (!((_b = (_a = this.hooks).shouldNarrate) == null ? void 0 : _b.call(_a))) return;
+      if (!step.title && !step.description) return;
+      (_d = (_c = this.hooks).onNarration) == null ? void 0 : _d.call(_c, step.title, step.description, this.trackId);
+    }
+    async _executeCore(step, manual) {
+      var _a, _b, _c, _d, _e2, _f, _g, _h, _i, _j, _k, _l;
+      switch (step.kind) {
+        case "travel":
+          await ((_b = (_a = this.hooks).travel) == null ? void 0 : _b.call(_a, step, manual, this.trackId));
+          break;
+        case "dwell":
+          await ((_d = (_c = this.hooks).dwell) == null ? void 0 : _d.call(_c, step, manual, this.trackId));
+          break;
+        case "parallel":
+          await this._executeParallel(step, manual);
+          break;
+        case "setPill":
+          (_f = (_e2 = this.hooks).setPill) == null ? void 0 : _f.call(_e2, step, this.trackId);
+          break;
+        case "setEffect":
+          (_h = (_g = this.hooks).setEffect) == null ? void 0 : _h.call(_g, step, this.trackId);
+          break;
+        case "wait":
+          if (!manual && step.ms > 0) await this._sleep(step.ms);
+          break;
+        case "focus":
+          (_j = (_i = this.hooks).focus) == null ? void 0 : _j.call(_i, step, this.trackId);
+          break;
+        case "narrate":
+          if (!manual && step.ms > 0 && !((_l = (_k = this.hooks).shouldSkipNarratePause) == null ? void 0 : _l.call(_k))) {
+            await this._sleep(step.ms);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    async _executeParallel(step, manual) {
+      var _a, _b, _c, _d, _e2, _f;
+      const items = step.parallel;
+      const sequential = (_b = (_a = this.hooks).shouldSequentialParallel) == null ? void 0 : _b.call(_a);
+      const stepIndex = this.stepIndex - 1;
+      if (sequential) {
+        for (let i = 0; i < items.length; i++) {
+          const sub = items[i];
+          if (sub.delay) await this._sleep(sub.delay);
+          (_d = (_c = this.hooks).onStepStart) == null ? void 0 : _d.call(_c, sub, manual, this.trackId, {
+            stepIndex,
+            subIndex: i,
+            parallel: true
+          });
+          await this._executeCore(sub, manual);
+          this._emitNarration(sub);
+          (_f = (_e2 = this.hooks).onStep) == null ? void 0 : _f.call(_e2, sub, this.trackId);
+          if (!manual && i < items.length - 1) await this._sleep(220);
+        }
+        return;
+      }
+      await Promise.all(items.map(async (sub) => {
+        const delay = sub.delay || 0;
+        await this._sleep(delay);
+        return this._execute(sub, manual);
+      }));
+    }
+    _sleep(ms) {
+      return new Promise((r) => setTimeout(r, this._scaled(ms)));
+    }
+  };
+  var MultiTrackPlayer = class {
+    constructor(config, hooks) {
+      var _a;
+      this.config = config;
+      this.scenario = config.scenario;
+      this.hooks = {
+        ...hooks,
+        onTrackEnd: (trackId) => {
+          var _a2;
+          if (this._narrativeSequential) this._advanceNarrativeTrack();
+          (_a2 = hooks.onTrackEnd) == null ? void 0 : _a2.call(hooks, trackId);
+        }
+      };
+      this.players = this.scenario.tracks.map(
+        (track) => new FlowPlayer(track, this.scenario, this.hooks)
+      );
+      this.activeTrackId = ((_a = this.players[0]) == null ? void 0 : _a.trackId) || "main";
+      this.narrativeTrackIndex = 0;
+      this.speed = this.scenario.speed || 1;
+      this._narrativePlaying = false;
+    }
+    get tracks() {
+      return this.scenario.tracks;
+    }
+    player(id) {
+      return this.players.find((p2) => p2.trackId === id);
+    }
+    activePlayer() {
+      return this.player(this.activeTrackId) || this.players[0];
+    }
+    setSpeed(s) {
+      this.speed = s;
+      this.players.forEach((p2) => {
+        p2.speed = s;
+      });
+    }
+    reset() {
+      var _a, _b;
+      this.players.forEach((p2) => p2.reset());
+      this.narrativeTrackIndex = 0;
+      this._narrativeSequential = false;
+      (_b = (_a = this.hooks).onReset) == null ? void 0 : _b.call(_a);
+    }
+    stopAll() {
+      this.players.forEach((p2) => p2.stopPlay());
+      this._narrativeSequential = false;
+    }
+    startParallel() {
+      this.stopAll();
+      this.players.forEach((p2) => {
+        p2.speed = this.speed;
+        p2.startPlay(p2.track.offset || 0);
+      });
+    }
+    startNarrativeSequential() {
+      this.stopAll();
+      this._narrativeSequential = true;
+      this._narrativeTrackIndex = 0;
+      this._startNarrativeTrack(0);
+    }
+    _startNarrativeTrack(index) {
+      const p2 = this.players[index];
+      if (!p2) {
+        if (this.scenario.loop) {
+          this._startNarrativeTrack(0);
+        } else {
+          this._narrativeSequential = false;
+        }
+        return;
+      }
+      this.narrativeTrackIndex = index;
+      this.activeTrackId = p2.trackId;
+      p2.reset();
+      p2._forceNoLoop = true;
+      p2.speed = this.speed;
+      p2.startPlay(p2.track.offset || 0);
+    }
+    _advanceNarrativeTrack() {
+      if (!this._narrativeSequential) return;
+      this._startNarrativeTrack(this.narrativeTrackIndex + 1);
+    }
+    async stepNext() {
+      return this.activePlayer().runNext(true);
+    }
+    async stepPrev() {
+      return this.activePlayer().runPrev();
+    }
+  };
+
   // src/config.js
   var DEFAULTS = {
     viewport: { width: "100%", height: 420, padding: 40 },
@@ -1954,9 +2137,17 @@ var FlowGraph = (() => {
     },
     tokens: { shape: "circle", size: 7, speed: 120, color: "#7C3AED" },
     layout: { engine: "layered", direction: "LR", rankGap: 140, nodeGap: 100 },
-    metrics: { nodePanel: true, nodeDrawer: true, systemPanel: true, globalDrawer: true, windowSec: 30, charts: true },
-    randomness: { enabled: false, duration: { jitter: 0.2 }, speed: { jitter: 0.1 }, sources: { jitter: 0.15 } },
-    controls: { toolbar: true, playPause: true, zoomReset: true, metricsDrawer: true, reset: true, layout: false },
+    controls: {
+      toolbar: true,
+      playPause: true,
+      zoomReset: true,
+      reset: true,
+      layout: false,
+      step: true,
+      fullscreen: true,
+      metricsDrawer: false,
+      speed: true
+    },
     interaction: { nodeDrag: true, nodeSelect: true },
     maxParticles: 200
   };
@@ -1967,6 +2158,7 @@ var FlowGraph = (() => {
     danger: "#9B1C1C"
   };
   var VALID_TYPES = /* @__PURE__ */ new Set(["port", "process"]);
+  var VALID_ROUTING = /* @__PURE__ */ new Set(["bezier", "straight", "loopback", "orthogonal"]);
   function edgeId(from, to, explicit) {
     return explicit || `${from}-${to}`;
   }
@@ -1994,61 +2186,8 @@ var FlowGraph = (() => {
   function defaultSize(shape) {
     return shape === "circle" ? { w: 64, h: 64 } : { w: 96, h: 56 };
   }
-  function normalizeEmit(raw, rejectEdge) {
-    var _a, _b;
-    if (!raw) {
-      if (rejectEdge) return { mode: "excludeReject", count: 1 };
-      return { mode: "all", count: 1 };
-    }
-    const mode = raw.mode || "all";
-    if (mode === "map") {
-      return { mode: "map", map: raw.map || {}, count: (_a = raw.count) != null ? _a : 1, token: raw.token };
-    }
-    return { mode, count: (_b = raw.count) != null ? _b : 1, token: raw.token, map: raw.map };
-  }
-  function normalizeGate(raw) {
-    var _a, _b, _c;
-    const g = raw == null ? void 0 : raw.gate;
-    if (!g) return { count: 1, from: "any" };
-    if (Array.isArray(g.from)) return { count: (_a = g.count) != null ? _a : 1, from: g.from };
-    if (g.from === "all-edges") return { count: (_b = g.count) != null ? _b : 1, from: "all-edges" };
-    return { count: (_c = g.count) != null ? _c : 1, from: g.from || "any" };
-  }
-  function normalizeAdmission(raw) {
-    var _a, _b;
-    const a = raw.admission;
-    if (!a) {
-      return { mode: "queue", max: null, step: 1, rejectEdge: null };
-    }
-    return {
-      mode: a.mode || "queue",
-      max: (_a = a.max) != null ? _a : null,
-      step: (_b = a.step) != null ? _b : 1,
-      rejectEdge: a.rejectEdge || null
-    };
-  }
-  function normalizeRetry(raw) {
-    var _a;
-    if (!raw.retry) return null;
-    return {
-      backEdge: raw.retry.backEdge,
-      maxRetries: (_a = raw.retry.maxRetries) != null ? _a : 3
-    };
-  }
-  function normalizeCircuit(raw) {
-    var _a, _b, _c;
-    if (!raw.circuit) return null;
-    const c = raw.circuit;
-    return {
-      failureRate: (_a = c.failureRate) != null ? _a : 0.25,
-      failureThreshold: (_b = c.failureThreshold) != null ? _b : 5,
-      recoveryMs: (_c = c.recoveryMs) != null ? _c : 8e3,
-      acceptEdge: c.acceptEdge || null,
-      fallbackEdge: c.fallbackEdge || null
-    };
-  }
   function normalizeNode(n, theme) {
-    var _a, _b;
+    var _a;
     const type = n.type || "process";
     if (!VALID_TYPES.has(type)) {
       throw new Error(`FlowGraph: unknown node type "${type}" on "${n.id}"`);
@@ -2064,11 +2203,6 @@ var FlowGraph = (() => {
       ...n.style || {}
     };
     if (n.tone && TONE_COLORS[n.tone]) style.stroke = TONE_COLORS[n.tone];
-    const admission = normalizeAdmission(n);
-    const gate = type === "process" ? normalizeGate(n) : { count: 1, from: "any" };
-    const emit = type === "process" ? normalizeEmit(n.emit, admission.rejectEdge) : null;
-    const retry = type === "process" ? normalizeRetry(n) : null;
-    const circuit = type === "process" ? normalizeCircuit(n) : null;
     return {
       id: n.id,
       x: n.x,
@@ -2082,21 +2216,19 @@ var FlowGraph = (() => {
       tone: n.tone || null,
       style,
       pillTop: normalizePills(n.pillTop),
-      pillBottom: [],
-      duration: type === "process" ? (_a = n.duration) != null ? _a : 800 : 0,
-      durationJitter: n.durationJitter,
-      admission,
-      gate,
-      emit,
-      retry,
-      circuit,
-      rejectToken: normalizeToken(n.rejectToken, theme),
-      showReceived: n.showReceived === true,
-      emitToken: ((_b = n.emit) == null ? void 0 : _b.token) || n.emitToken || null
+      pillBottom: normalizePills(n.pillBottom),
+      metrics: n.metrics ? {
+        queue: n.metrics.queue ? { max: (_a = n.metrics.queue.max) != null ? _a : null } : null,
+        count: n.metrics.count === true
+      } : null
     };
   }
   function normalizeEdge(e, theme) {
     var _a, _b, _c, _d, _e2;
+    const routing = e.routing || "bezier";
+    if (!VALID_ROUTING.has(routing)) {
+      throw new Error(`FlowGraph: unknown routing "${routing}" on edge "${e.id || `${e.from}-${e.to}`}"`);
+    }
     const strokeRaw = e.stroke || {};
     const dashMap = { solid: null, dash: "6 4", dot: "2 3" };
     const dashVal = strokeRaw.dash;
@@ -2105,24 +2237,41 @@ var FlowGraph = (() => {
       id: edgeId(e.from, e.to, e.id),
       from: e.from,
       to: e.to,
-      routing: e.routing || "bezier",
+      routing,
       loopSide: e.loopSide || null,
-      weight: (_a = e.weight) != null ? _a : null,
-      speed: (_b = e.speed) != null ? _b : null,
+      speed: (_a = e.speed) != null ? _a : null,
       animated: e.animated === true,
       stroke: {
         color: resolveColor(strokeRaw.color || e.color, theme),
-        width: (_d = (_c = strokeRaw.width) != null ? _c : e.width) != null ? _d : 2,
+        width: (_c = (_b = strokeRaw.width) != null ? _b : e.width) != null ? _c : 2,
         dash
       },
-      label: e.label ? typeof e.label === "string" ? { text: e.label, icon: null, animated: false, progress: null } : { text: e.label.text || null, icon: e.label.icon || null, animated: e.label.animated, progress: (_e2 = e.label.progress) != null ? _e2 : null } : null,
+      label: e.label ? typeof e.label === "string" ? { text: e.label, icon: null, animated: false, progress: null, position: "above" } : {
+        text: e.label.text || null,
+        icon: e.label.icon || null,
+        animated: e.label.animated,
+        progress: (_d = e.label.progress) != null ? _d : null,
+        position: e.label.position || "above",
+        offset: (_e2 = e.label.offset) != null ? _e2 : null
+      } : null,
       token: normalizeToken(e.token, theme)
     };
+  }
+  function normalizeTokenTypes(raw, theme, tokenDefault) {
+    const types = { default: { ...tokenDefault } };
+    if (!raw) return types;
+    Object.entries(raw).forEach(([key, val]) => {
+      types[key] = normalizeToken({ ...tokenDefault, ...val }, theme) || { ...tokenDefault };
+    });
+    return types;
   }
   function parseConfig(raw) {
     var _a, _b;
     if (!raw || !raw.nodes || !raw.edges) {
       throw new Error("FlowGraph: config requires nodes[] and edges[]");
+    }
+    if (!raw.scenario) {
+      throw new Error("FlowGraph: config requires scenario (v2 visual format)");
     }
     const theme = { ...DEFAULTS.theme, ...raw.theme || {} };
     const viewport = { ...DEFAULTS.viewport, ...raw.viewport || {} };
@@ -2131,8 +2280,6 @@ var FlowGraph = (() => {
     }
     const zoom = { ...DEFAULTS.zoom, ...raw.zoom || {} };
     const layout = { ...DEFAULTS.layout, ...raw.layout || {} };
-    const metrics = { ...DEFAULTS.metrics, ...raw.metrics || {} };
-    const randomness = { ...DEFAULTS.randomness, ...raw.randomness || {} };
     const tokenDefault = normalizeToken({ ...DEFAULTS.tokens, ...raw.tokens || {} }, theme) || { ...DEFAULTS.tokens };
     let nodes = raw.nodes.map((n) => normalizeNode(n, theme));
     const edges = raw.edges.map((e) => normalizeEdge(e, theme));
@@ -2160,32 +2307,17 @@ var FlowGraph = (() => {
       outgoing[e.from].push(e);
       incoming[e.to].push(e);
     });
-    const sources = (raw.sources || []).map((s, i) => {
-      var _a2, _b2;
-      const edgeRef = s.edge || (s.from && s.to ? edgeId(s.from, s.to) : null);
-      if (!edgeRef) throw new Error(`FlowGraph: source[${i}] needs edge or from/to`);
-      const edge = edgesById[edgeRef] || edges.find((e) => e.from === s.from && e.to === s.to);
-      if (!edge) throw new Error(`FlowGraph: source[${i}] references unknown edge "${edgeRef}"`);
-      return {
-        id: s.id || `source-${i}`,
-        edgeId: edge.id,
-        interval: s.interval != null ? s.interval : 1400,
-        delay: (_a2 = s.delay) != null ? _a2 : 0,
-        jitter: s.jitter || ((_b2 = randomness.sources) == null ? void 0 : _b2.jitter) || 0,
-        burst: s.burst || { count: 1, spacing: 60 },
-        token: normalizeToken({ ...tokenDefault, ...s.token || {} }, theme) || { ...tokenDefault },
-        enabled: s.enabled !== false
-      };
-    });
+    const tokenTypes = normalizeTokenTypes(raw.tokenTypes, theme, tokenDefault);
+    const scenario = normalizeScenario(raw.scenario);
     return {
       title: raw.title || null,
       viewport,
       zoom,
       theme,
       layout,
-      metrics,
-      randomness,
       tokenDefault,
+      tokenTypes,
+      scenario,
       maxParticles: (_b = raw.maxParticles) != null ? _b : DEFAULTS.maxParticles,
       controls: { ...DEFAULTS.controls, ...raw.controls || {} },
       interaction: { ...DEFAULTS.interaction, ...raw.interaction || {} },
@@ -2196,57 +2328,199 @@ var FlowGraph = (() => {
       edges,
       edgesById,
       outgoing,
-      incoming,
-      sources
+      incoming
     };
   }
-  function resolveTokenConfig(config, fromNode, edge) {
-    var _a;
-    const base = { ...config.tokenDefault };
-    if (fromNode == null ? void 0 : fromNode.emitToken) Object.assign(base, fromNode.emitToken);
+  function resolveTokenType(config, typeKey, edge) {
+    const base = { ...config.tokenTypes.default || config.tokenDefault };
+    if (typeKey && config.tokenTypes[typeKey]) Object.assign(base, config.tokenTypes[typeKey]);
     if (edge == null ? void 0 : edge.token) Object.assign(base, edge.token);
-    const rejectId = (_a = fromNode == null ? void 0 : fromNode.admission) == null ? void 0 : _a.rejectEdge;
-    if ((fromNode == null ? void 0 : fromNode.rejectToken) && (edge == null ? void 0 : edge.id) === rejectId) Object.assign(base, fromNode.rejectToken);
     if (base.color) base.color = resolveColor(base.color, config.theme);
     return base;
   }
-  function applyNodePatch(config, nodeId, patch) {
-    const node = config.nodesById[nodeId];
-    if (!node) throw new Error(`FlowGraph: unknown node "${nodeId}"`);
-    if (patch.duration != null) node.duration = Number(patch.duration);
-    if (patch.showReceived != null) node.showReceived = !!patch.showReceived;
-    if (patch.admission) {
-      node.admission = { ...node.admission, ...patch.admission };
+
+  // src/edge-orthogonal.js
+  var LANE_GAP = 20;
+  function nodeBounds(node) {
+    const { w: w2, h } = node.size;
+    const hw = w2 / 2;
+    if (node.shape === "circle") return { hw, hh: hw };
+    return { hw, hh: h / 2 };
+  }
+  function boundaryOnSide(node, side, lane = 0) {
+    const { hw, hh } = nodeBounds(node);
+    switch (side) {
+      case "right":
+        return { x: node.x + hw, y: node.y + lane, side };
+      case "left":
+        return { x: node.x - hw, y: node.y + lane, side };
+      case "top":
+        return { x: node.x + lane, y: node.y - hh, side };
+      case "bottom":
+        return { x: node.x + lane, y: node.y + hh, side };
+      default:
+        return { x: node.x + hw, y: node.y + lane, side: "right" };
     }
-    if (patch.gate) {
-      const { mode, count } = patch.gate;
-      if (mode === "all") node.gate = { count: count != null ? count : 1, from: "all-edges" };
-      else node.gate = { count: count != null ? count : 1, from: "any" };
+  }
+  function pickSides(fromNode, toNode) {
+    const dx = toNode.x - fromNode.x;
+    const dy = toNode.y - fromNode.y;
+    if (Math.abs(dx) >= Math.abs(dy) * 0.65) {
+      return dx >= 0 ? { exit: "right", enter: "left" } : { exit: "left", enter: "right" };
     }
-    if (patch.retry) {
-      node.retry = { ...node.retry, ...patch.retry };
+    return dy >= 0 ? { exit: "bottom", enter: "top" } : { exit: "top", enter: "bottom" };
+  }
+  function isHorizontalSide(side) {
+    return side === "left" || side === "right";
+  }
+  function buildOrthogonalPoints(fromNode, toNode, anchorOff = {}) {
+    const lane = anchorOff.lane || 0;
+    const sides = pickSides(fromNode, toNode);
+    const p0 = boundaryOnSide(fromNode, sides.exit, isHorizontalSide(sides.exit) ? lane : 0);
+    const p3 = boundaryOnSide(toNode, sides.enter, isHorizontalSide(sides.enter) ? lane : 0);
+    const pts = [p0];
+    if (sides.exit === "right" && sides.enter === "left") {
+      const midX = (p0.x + p3.x) / 2 + lane * 0.2;
+      if (Math.abs(p0.y - p3.y) < 4) {
+        if (lane !== 0) {
+          pts.push({ x: p0.x + 16, y: p0.y }, { x: p0.x + 16, y: p0.y + lane }, { x: p3.x - 16, y: p0.y + lane }, { x: p3.x - 16, y: p3.y });
+        } else {
+          pts.push({ x: p3.x, y: p0.y });
+        }
+      } else {
+        pts.push({ x: midX, y: p0.y }, { x: midX, y: p3.y });
+      }
+      pts.push(p3);
+      return pts;
     }
-    if (patch.circuit) {
-      node.circuit = { ...node.circuit, ...patch.circuit };
+    if (sides.exit === "left" && sides.enter === "right") {
+      const midX = (p0.x + p3.x) / 2 - lane * 0.2;
+      if (Math.abs(p0.y - p3.y) < 4) {
+        if (lane !== 0) {
+          pts.push({ x: p0.x - 16, y: p0.y }, { x: p0.x - 16, y: p0.y + lane }, { x: p3.x + 16, y: p0.y + lane }, { x: p3.x + 16, y: p3.y });
+        } else {
+          pts.push({ x: p3.x, y: p0.y });
+        }
+      } else {
+        pts.push({ x: midX, y: p0.y }, { x: midX, y: p3.y });
+      }
+      pts.push(p3);
+      return pts;
     }
-    if (patch.weights && typeof patch.weights === "object") {
-      Object.entries(patch.weights).forEach(([edgeId2, weight]) => {
-        const edge = config.edgesById[edgeId2];
-        if (edge && edge.from === nodeId) edge.weight = Number(weight);
+    if (sides.exit === "bottom" && sides.enter === "top") {
+      const midY = p0.y + Math.max(40, (p3.y - p0.y) * 0.45) + lane * 0.35;
+      if (Math.abs(p0.x - p3.x) < 4) {
+        pts.push({ x: p0.x, y: p3.y });
+      } else {
+        pts.push({ x: p0.x, y: midY }, { x: p3.x, y: midY });
+      }
+      pts.push(p3);
+      return pts;
+    }
+    if (sides.exit === "top" && sides.enter === "bottom") {
+      const midY = p0.y - Math.max(40, (p0.y - p3.y) * 0.45) - lane * 0.35;
+      if (Math.abs(p0.x - p3.x) < 4) {
+        pts.push({ x: p0.x, y: p3.y });
+      } else {
+        pts.push({ x: p0.x, y: midY }, { x: p3.x, y: midY });
+      }
+      pts.push(p3);
+      return pts;
+    }
+    if (isHorizontalSide(sides.exit)) {
+      pts.push({ x: p3.x, y: p0.y });
+    } else {
+      pts.push({ x: p0.x, y: p3.y });
+    }
+    pts.push(p3);
+    return pts;
+  }
+  function polylineToPath(points) {
+    if (!points.length) return "";
+    return points.map((p2, i) => `${i === 0 ? "M" : "L"} ${p2.x} ${p2.y}`).join(" ");
+  }
+  function polylineLength(points) {
+    let len = 0;
+    for (let i = 1; i < points.length; i++) {
+      len += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    }
+    return len;
+  }
+  function pointOnPolyline(points, t) {
+    var _a, _b;
+    const total = polylineLength(points);
+    if (total < 1) return { x: ((_a = points[0]) == null ? void 0 : _a.x) || 0, y: ((_b = points[0]) == null ? void 0 : _b.y) || 0, angle: 0, segment: 0 };
+    const target = Math.max(0, Math.min(1, t)) * total;
+    let acc = 0;
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1];
+      const b = points[i];
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+      if (acc + segLen >= target) {
+        const u = segLen > 0 ? (target - acc) / segLen : 0;
+        const x2 = a.x + (b.x - a.x) * u;
+        const y = a.y + (b.y - a.y) * u;
+        const angle = Math.abs(b.x - a.x) >= Math.abs(b.y - a.y) ? 0 : Math.PI / 2;
+        return { x: x2, y, angle, segment: i - 1, horizontal: Math.abs(b.y - a.y) < 1 };
+      }
+      acc += segLen;
+    }
+    const last = points[points.length - 1];
+    return { x: last.x, y: last.y, angle: 0, segment: points.length - 2, horizontal: true };
+  }
+  function labelOnPolyline(points, lane = 0) {
+    let best = null;
+    let bestLen = 0;
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1];
+      const b = points[i];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const horizontal = Math.abs(b.y - a.y) < 2;
+      if (horizontal && len > bestLen) {
+        bestLen = len;
+        best = {
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2 - 12 - lane * 0.15,
+          angle: 0
+        };
+      }
+    }
+    if (best) return best;
+    return pointOnPolyline(points, 0.5);
+  }
+  function computeOrthogonalLanes(edges, nodesById) {
+    const fromGroups = {};
+    const offsets = {};
+    edges.forEach((edge) => {
+      if (edge.routing !== "orthogonal") return;
+      const fromNode = nodesById[edge.from];
+      const toNode = nodesById[edge.to];
+      if (!fromNode || !toNode) return;
+      const key = `${edge.from}:${edge.routing}`;
+      if (!fromGroups[key]) fromGroups[key] = [];
+      fromGroups[key].push({ edge, angle: Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x) });
+      if (!offsets[edge.id]) offsets[edge.id] = {};
+      offsets[edge.id].lane = 0;
+    });
+    Object.values(fromGroups).forEach((group) => {
+      if (group.length <= 1) return;
+      group.sort((a, b) => a.angle - b.angle);
+      const n = group.length;
+      group.forEach((item, i) => {
+        if (!offsets[item.edge.id]) offsets[item.edge.id] = {};
+        offsets[item.edge.id].lane = (i - (n - 1) / 2) * LANE_GAP;
       });
-      node.emit = { ...node.emit, mode: "weighted" };
-    }
-    const idx = config.nodes.findIndex((n) => n.id === nodeId);
-    if (idx >= 0) config.nodes[idx] = node;
-    return node;
+    });
+    return offsets;
   }
 
   // src/geometry.js
   init_compose_pills();
   var NS = "http://www.w3.org/2000/svg";
-  var ANGLE_SPREAD = 0.14;
-  var LABEL_T_SPREAD = 0.12;
-  function nodeBounds(node) {
+  var ANGLE_SPREAD = 0.16;
+  var LATERAL_SPREAD = 18;
+  var LABEL_T_SPREAD = 0.14;
+  function nodeBounds2(node) {
     const { w: w2, h } = node.size;
     const hw = w2 / 2;
     const hh = h / 2;
@@ -2263,7 +2537,7 @@ var FlowGraph = (() => {
     return { x: cx + cos * t, y: cy + sin * t };
   }
   function boundaryPointAtAngle(node, angleRad) {
-    const { hw, hh } = nodeBounds(node);
+    const { hw, hh } = nodeBounds2(node);
     const cos = Math.cos(angleRad);
     const sin = Math.sin(angleRad);
     if (node.shape === "circle") {
@@ -2271,19 +2545,16 @@ var FlowGraph = (() => {
     }
     return rayRectIntersect(node.x, node.y, cos, sin, hw, hh);
   }
-  function isLoopbackEdge(fromNode, toNode, routing) {
-    if (routing === "loopback") return true;
-    if (routing === "straight") return false;
-    return toNode.x < fromNode.x - 20;
-  }
   function computeEdgeAnchorOffsets(edges, nodesById) {
+    const orthoLanes = computeOrthogonalLanes(edges, nodesById);
     const fromGroups = {};
     const toGroups = {};
-    const offsets = {};
+    const offsets = { ...orthoLanes };
     edges.forEach((edge) => {
       const fromNode = nodesById[edge.from];
       const toNode = nodesById[edge.to];
       if (!fromNode || !toNode) return;
+      if (edge.routing === "orthogonal") return;
       const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
       const kf = `${edge.from}:out`;
       const kt2 = `${edge.to}:in`;
@@ -2291,17 +2562,24 @@ var FlowGraph = (() => {
       if (!toGroups[kt2]) toGroups[kt2] = [];
       fromGroups[kf].push({ edge, angle });
       toGroups[kt2].push({ edge, angle });
-      offsets[edge.id] = { fromAngle: 0, toAngle: 0, labelT: 0.5 };
+      if (!offsets[edge.id]) {
+        offsets[edge.id] = { fromAngle: 0, toAngle: 0, labelT: 0.5, lateral: 0, loopScale: 1, lane: 0 };
+      }
     });
     function spreadAngle(groups, field) {
       Object.values(groups).forEach((group) => {
         if (group.length <= 1) return;
         group.sort((a, b) => a.angle - b.angle);
+        const n = group.length;
+        const angleStep = Math.min(0.32, ANGLE_SPREAD + (n - 2) * 0.04);
         group.forEach((item, i) => {
-          const delta = (i - (group.length - 1) / 2) * ANGLE_SPREAD;
+          const delta = (i - (n - 1) / 2) * angleStep;
           offsets[item.edge.id][field] = delta;
           if (field === "fromAngle") {
-            offsets[item.edge.id].labelT = 0.38 + i / Math.max(1, group.length - 1) * LABEL_T_SPREAD;
+            const lat = (i - (n - 1) / 2) * LATERAL_SPREAD;
+            offsets[item.edge.id].lateral = lat;
+            offsets[item.edge.id].loopScale = 1 + Math.abs(i - (n - 1) / 2) * 0.24;
+            offsets[item.edge.id].labelT = 0.28 + i / Math.max(1, n - 1) * LABEL_T_SPREAD;
           }
         });
       });
@@ -2327,7 +2605,7 @@ var FlowGraph = (() => {
     const goingBack = toNode.x < fromNode.x - 8;
     return goingBack ? "below" : "above";
   }
-  function loopbackControls(p0, p3, fromNode, toNode, loopSide) {
+  function loopbackControls(p0, p3, fromNode, toNode, loopSide, lateral = 0, loopScale = 1) {
     const dx = p3.x - p0.x;
     const dy = p3.y - p0.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -2343,26 +2621,57 @@ var FlowGraph = (() => {
       nx = -nx;
       ny = -ny;
     }
-    const bulge = Math.max(52, len * 0.32 + 42);
-    const p1 = { x: p0.x + nx * bulge * 0.55 + dx * 0.12, y: p0.y + ny * bulge * 0.55 + dy * 0.12 };
-    const p2 = { x: p3.x + nx * bulge * 0.55 - dx * 0.12, y: p3.y + ny * bulge * 0.55 - dy * 0.12 };
+    const bulge = Math.max(52, len * 0.32 + 42) * loopScale;
+    const latShift = lateral * 0.4;
+    const p1 = {
+      x: p0.x + nx * (bulge * 0.55 + latShift) + dx * 0.12,
+      y: p0.y + ny * (bulge * 0.55 + latShift) + dy * 0.12
+    };
+    const p2 = {
+      x: p3.x + nx * (bulge * 0.55 + latShift) - dx * 0.12,
+      y: p3.y + ny * (bulge * 0.55 + latShift) - dy * 0.12
+    };
     return { p0, p1, p2, p3 };
   }
-  function forwardControls(p0, p3, angleOut, angleIn) {
+  function forwardControls(p0, p3, angleOut, angleIn, lateral = 0) {
     const dx = p3.x - p0.x;
     const dy = p3.y - p0.y;
     const dist = Math.hypot(dx, dy) || 1;
     const cpOffset = Math.min(dist * 0.45, 90);
+    const perpX = -Math.sin(angleOut) * lateral;
+    const perpY = Math.cos(angleOut) * lateral;
+    const blend = 0.6;
     return {
       p0,
-      p1: { x: p0.x + Math.cos(angleOut) * cpOffset, y: p0.y + Math.sin(angleOut) * cpOffset },
-      p2: { x: p3.x + Math.cos(angleIn) * cpOffset, y: p3.y + Math.sin(angleIn) * cpOffset },
+      p1: {
+        x: p0.x + Math.cos(angleOut) * cpOffset + perpX * blend,
+        y: p0.y + Math.sin(angleOut) * cpOffset + perpY * blend
+      },
+      p2: {
+        x: p3.x + Math.cos(angleIn) * cpOffset + perpX * blend,
+        y: p3.y + Math.sin(angleIn) * cpOffset + perpY * blend
+      },
       p3
     };
   }
   function edgePathControls(fromNode, toNode, routing, anchorOffsets, loopSide) {
-    const baseAngle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
     const off = anchorOffsets || { fromAngle: 0, toAngle: 0 };
+    if (routing === "orthogonal") {
+      const points = buildOrthogonalPoints(fromNode, toNode, off);
+      return { kind: "polyline", points };
+    }
+    if (routing === "loopback") {
+      const baseAngle2 = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+      const angleOut2 = baseAngle2 + (off.fromAngle || 0);
+      const angleIn2 = baseAngle2 + Math.PI + (off.toAngle || 0);
+      const p02 = boundaryPointAtAngle(fromNode, angleOut2);
+      const p32 = boundaryPointAtAngle(toNode, angleIn2);
+      return {
+        kind: "cubic",
+        ...loopbackControls(p02, p32, fromNode, toNode, loopSide, off.lateral || 0, off.loopScale || 1)
+      };
+    }
+    const baseAngle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
     const angleOut = baseAngle + (off.fromAngle || 0);
     const angleIn = baseAngle + Math.PI + (off.toAngle || 0);
     const p0 = boundaryPointAtAngle(fromNode, angleOut);
@@ -2370,18 +2679,17 @@ var FlowGraph = (() => {
     if (routing === "straight") {
       return { kind: "line", p0, p3 };
     }
-    if (routing === "loopback" || isLoopbackEdge(fromNode, toNode, routing)) {
-      return { kind: "cubic", ...loopbackControls(p0, p3, fromNode, toNode, loopSide) };
-    }
-    return { kind: "cubic", ...forwardControls(p0, p3, angleOut, angleIn) };
+    return { kind: "cubic", ...forwardControls(p0, p3, angleOut, angleIn, off.lateral || 0) };
   }
   function buildEdgePath(fromNode, toNode, routing, anchorOffsets, loopSide) {
     const ctrl = edgePathControls(fromNode, toNode, routing, anchorOffsets, loopSide);
+    if (ctrl.kind === "polyline") return polylineToPath(ctrl.points);
     if (ctrl.kind === "line") return `M ${ctrl.p0.x} ${ctrl.p0.y} L ${ctrl.p3.x} ${ctrl.p3.y}`;
     return `M ${ctrl.p0.x} ${ctrl.p0.y} C ${ctrl.p1.x} ${ctrl.p1.y}, ${ctrl.p2.x} ${ctrl.p2.y}, ${ctrl.p3.x} ${ctrl.p3.y}`;
   }
   function edgePathSamplePoints(fromNode, toNode, routing, anchorOffsets, loopSide) {
     const ctrl = edgePathControls(fromNode, toNode, routing, anchorOffsets, loopSide);
+    if (ctrl.kind === "polyline") return ctrl.points;
     if (ctrl.kind === "line") return [ctrl.p0, ctrl.p3];
     return sampleCubic(ctrl.p0, ctrl.p1, ctrl.p2, ctrl.p3);
   }
@@ -2415,7 +2723,7 @@ var FlowGraph = (() => {
     else if (len < 120) off = Math.max(off, 22);
     switch (position) {
       case "below":
-        return { x: pt.x - nx * off, y: pt.y - ny * off, angle: Math.atan2(dy, dx) };
+        return { x: pt.x + nx * off, y: pt.y + ny * off, angle: Math.atan2(dy, dx) };
       case "left":
         return { x: pt.x - dx / mag * off, y: pt.y - dy / mag * off, angle: Math.atan2(dy, dx) };
       case "right":
@@ -2424,7 +2732,7 @@ var FlowGraph = (() => {
         return { x: pt.x, y: pt.y, angle: Math.atan2(dy, dx) };
       case "above":
       default:
-        return { x: pt.x + nx * off, y: pt.y + ny * off, angle: Math.atan2(dy, dx) };
+        return { x: pt.x - nx * off, y: pt.y - ny * off, angle: Math.atan2(dy, dx) };
     }
   }
   function pillChrome(node) {
@@ -2439,7 +2747,7 @@ var FlowGraph = (() => {
     let maxX = -Infinity;
     let maxY = -Infinity;
     nodes.forEach((n) => {
-      const { hw, hh } = nodeBounds(n);
+      const { hw, hh } = nodeBounds2(n);
       const chrome = pillChrome(n);
       minX = Math.min(minX, n.x - hw - chrome.left);
       minY = Math.min(minY, n.y - hh - chrome.top);
@@ -2460,7 +2768,7 @@ var FlowGraph = (() => {
     let maxX = -Infinity;
     let maxY = -Infinity;
     nodes.forEach((n) => {
-      const { hw, hh } = nodeBounds(n);
+      const { hw, hh } = nodeBounds2(n);
       const chrome = pillChrome(n);
       minX = Math.min(minX, n.x - hw - chrome.left);
       minY = Math.min(minY, n.y - hh - chrome.top);
@@ -2582,7 +2890,35 @@ var FlowGraph = (() => {
       resetZoom,
       updateBounds,
       screenToGraph,
-      getTransform: () => ({ scale: state.scale, tx: state.tx, ty: state.ty })
+      getTransform: () => ({ scale: state.scale, tx: state.tx, ty: state.ty }),
+      focusOnNodes(fromId, toId, nodesById, padding = 48) {
+        const ids = [fromId, toId].filter(Boolean);
+        const nodes = ids.map((id) => nodesById[id]).filter(Boolean);
+        if (!nodes.length) return;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        nodes.forEach((n) => {
+          minX = Math.min(minX, n.x - 36);
+          maxX = Math.max(maxX, n.x + 36);
+          minY = Math.min(minY, n.y - 36);
+          maxY = Math.max(maxY, n.y + 36);
+        });
+        const bx = minX - padding;
+        const by = minY - padding;
+        const bw = maxX - minX + padding * 2;
+        const bh = maxY - minY + padding * 2;
+        const rect = svg.getBoundingClientRect();
+        if (!rect.width || !rect.height || !bw || !bh) return;
+        const sx = rect.width / bw;
+        const sy = rect.height / bh;
+        state.scale = Math.min(sx, sy, zoomCfg.max || 2.5);
+        state.scale = Math.max(state.scale, zoomCfg.min || 0.4);
+        state.tx = (rect.width - bw * state.scale) / 2 - bx * state.scale;
+        state.ty = (rect.height - bh * state.scale) / 2 - by * state.scale;
+        applyTransform(state.scale, state.tx, state.ty);
+      }
     };
   }
 
@@ -2634,7 +2970,8 @@ var FlowGraph = (() => {
       const fromNode = nodesById[edge.from];
       const toNode = nodesById[edge.to];
       if (!fromNode || !toNode) return;
-      const off = anchorOffsets[edge.id] || { fromAngle: 0, toAngle: 0, labelT: 0.5 };
+      const off = anchorOffsets[edge.id] || { fromAngle: 0, toAngle: 0, labelT: 0.5, lane: 0 };
+      const ctrl = edgePathControls(fromNode, toNode, edge.routing, off, edge.loopSide);
       const d = buildEdgePath(fromNode, toNode, edge.routing, off, edge.loopSide);
       const g = document.createElementNS(NS2, "g");
       g.setAttribute("class", "fg-edge");
@@ -2653,16 +2990,20 @@ var FlowGraph = (() => {
         labelGroup = createLabelGroup(edge.label.text, edge.label, theme);
         labelsLayer.appendChild(labelGroup.g);
       }
-      edgeViews[edge.id] = { g, path, labelGroup, edge, anchorOff: off };
+      edgeViews[edge.id] = { g, path, labelGroup, edge, anchorOff: off, ctrl };
     });
     function updateLabels() {
-      Object.values(edgeViews).forEach(({ path, labelGroup, edge, anchorOff }) => {
-        var _a;
+      Object.values(edgeViews).forEach(({ path, labelGroup, edge, anchorOff, ctrl }) => {
         if (!labelGroup || !edge.label) return;
-        const rawT = (_a = anchorOff == null ? void 0 : anchorOff.labelT) != null ? _a : 0.5;
-        const t = Math.max(0.34, Math.min(0.66, rawT));
-        const baseOff = edge.label.offset != null ? edge.label.offset : 20;
-        const pos = labelPosition(path, edge.label.position, baseOff, t);
+        if (edge.routing === "orthogonal" && (ctrl == null ? void 0 : ctrl.kind) === "polyline") {
+          const pos2 = labelOnPolyline(ctrl.points, (anchorOff == null ? void 0 : anchorOff.lane) || 0);
+          labelGroup.g.setAttribute("transform", `translate(${pos2.x},${pos2.y})`);
+          return;
+        }
+        const t = 0.5;
+        const baseOff = edge.label.offset != null ? edge.label.offset : 18;
+        const posLabel = edge.label.position === "center" ? "above" : edge.label.position || "above";
+        const pos = labelPosition(path, posLabel, baseOff, t);
         labelGroup.g.setAttribute("transform", `translate(${pos.x},${pos.y})`);
       });
     }
@@ -2683,6 +3024,7 @@ var FlowGraph = (() => {
           if (!fromNode || !toNode) return;
           const off = offsets[edge.id] || view.anchorOff;
           view.anchorOff = off;
+          view.ctrl = edgePathControls(fromNode, toNode, edge.routing, off, edge.loopSide);
           const d = buildEdgePath(fromNode, toNode, edge.routing, off, edge.loopSide);
           path.setAttribute("d", d);
         });
@@ -2700,6 +3042,11 @@ var FlowGraph = (() => {
         const view = edgeViews[edgeId2];
         if (!view) return;
         view.path.classList.toggle("fg-edge-dimmed", !!dimmed);
+      },
+      setStepActive(edgeId2, active) {
+        const view = edgeViews[edgeId2];
+        if (!view) return;
+        view.g.classList.toggle("fg-edge-step-active", !!active);
       },
       getPath(edgeId2) {
         var _a;
@@ -2779,7 +3126,7 @@ var FlowGraph = (() => {
     const bottomSlot = document.createElement("div");
     bottomSlot.className = "fg-node-slot fg-node-slot-bottom fg-node-bottom-pills";
     shell.appendChild(bottomSlot);
-    return { shell, bottomSlot };
+    return { shell, topSlot, bottomSlot };
   }
   function renderNodes(nodesLayer, nodes, theme) {
     const nodeViews = {};
@@ -2799,7 +3146,7 @@ var FlowGraph = (() => {
       g.appendChild(shape);
       const { w: w2, h } = node.size;
       const chrome = pillChrome(node);
-      const { shell, bottomSlot } = buildNodeContent(node);
+      const { shell, topSlot, bottomSlot } = buildNodeContent(node);
       const fo = document.createElementNS(NS3, "foreignObject");
       fo.setAttribute("x", String(-w2 / 2 - chrome.left));
       fo.setAttribute("y", String(-h / 2 - chrome.top));
@@ -2809,10 +3156,19 @@ var FlowGraph = (() => {
       fo.appendChild(shell);
       g.appendChild(fo);
       nodesLayer.appendChild(g);
-      nodeViews[node.id] = { g, shape, fo, node, bottomSlot };
+      nodeViews[node.id] = { g, shape, fo, node, topSlot, bottomSlot };
     });
     return {
       nodeViews,
+      setPillsTop(nodeId, pills) {
+        const view = nodeViews[nodeId];
+        if (!view) return;
+        view.topSlot.innerHTML = "";
+        (pills || []).forEach((p2) => view.topSlot.appendChild(renderPillEl(p2, "top")));
+        if (typeof window !== "undefined" && window.lucide) {
+          window.lucide.createIcons({ nodes: view.topSlot.querySelectorAll("[data-lucide]") });
+        }
+      },
       setPillsBottom(nodeId, pills) {
         const view = nodeViews[nodeId];
         if (!view) return;
@@ -2825,13 +3181,18 @@ var FlowGraph = (() => {
       setEffect(nodeId, effect) {
         const view = nodeViews[nodeId];
         if (!view) return;
-        view.g.classList.remove("fg-effect-pulse", "fg-effect-blink", "fg-effect-processing", "fg-effect-waiting", "fg-effect-active");
+        view.g.classList.remove("fg-effect-pulse", "fg-effect-blink", "fg-effect-processing", "fg-effect-waiting", "fg-effect-active", "fg-effect-open");
         if (effect) view.g.classList.add(`fg-effect-${effect}`);
       },
       setActive(nodeId, active) {
         const view = nodeViews[nodeId];
         if (!view) return;
         view.g.classList.toggle("fg-node-active", !!active);
+      },
+      setStepActive(nodeId, active) {
+        const view = nodeViews[nodeId];
+        if (!view) return;
+        view.g.classList.toggle("fg-node-step-active", !!active);
       },
       setSelected(nodeId, selected) {
         const view = nodeViews[nodeId];
@@ -2857,8 +3218,21 @@ var FlowGraph = (() => {
   var NS4 = "http://www.w3.org/2000/svg";
   var nextTokenId = 1;
   function applyTokenColor(shapeEl, tokenCfg) {
-    const color = tokenCfg.color || "#7C3AED";
-    shapeEl.setAttribute("fill", color);
+    shapeEl.setAttribute("fill", tokenCfg.color || "#7C3AED");
+  }
+  function addTokenLabel(inner, text, size) {
+    let labelEl = inner.querySelector(".fg-token-label");
+    if (!labelEl) {
+      labelEl = document.createElementNS(NS4, "text");
+      labelEl.setAttribute("class", "fg-token-label");
+      labelEl.setAttribute("text-anchor", "middle");
+      labelEl.setAttribute("dominant-baseline", "central");
+      inner.appendChild(labelEl);
+    }
+    const fontSize = Math.max(6, Math.round(size * 0.85));
+    labelEl.setAttribute("font-size", String(fontSize));
+    labelEl.setAttribute("fill", "#fff");
+    labelEl.textContent = text;
   }
   function createTokenShape(tokenCfg) {
     const shape = tokenCfg.shape || "circle";
@@ -2885,6 +3259,9 @@ var FlowGraph = (() => {
     }
     applyTokenColor(shapeEl, tokenCfg);
     inner.appendChild(shapeEl);
+    if (tokenCfg.label) {
+      addTokenLabel(inner, tokenCfg.label, size);
+    }
     g.appendChild(inner);
     g._fgInner = inner;
     g._fgShape = shapeEl;
@@ -2897,10 +3274,19 @@ var FlowGraph = (() => {
     inner.className.baseVal = "fg-token-inner";
     if (tokenCfg.effect) inner.classList.add(`fg-token-${tokenCfg.effect}`);
     applyTokenColor(shapeEl, tokenCfg);
+    const label = inner.querySelector(".fg-token-label");
+    if (tokenCfg.label) {
+      addTokenLabel(inner, tokenCfg.label, tokenCfg.size || 7);
+    } else if (label) {
+      label.remove();
+    }
   }
   function placeTokenAt(token, t) {
-    const pt = pathPointAt(token.path, t);
-    token.el.setAttribute("transform", `translate(${pt.x},${pt.y}) rotate(${pt.angle * 180 / Math.PI})`);
+    const progress = token.reverse ? 1 - t : t;
+    const pt = pathPointAt(token.path, progress);
+    let angle = pt.angle;
+    if (token.reverse) angle += Math.PI;
+    token.el.setAttribute("transform", `translate(${pt.x},${pt.y}) rotate(${angle * 180 / Math.PI})`);
   }
   var ParticleSystem = class {
     constructor(layer, edgeRenderer, config) {
@@ -2910,46 +3296,51 @@ var FlowGraph = (() => {
       this.pool = [];
       this.active = [];
       this.maxParticles = config.maxParticles || 200;
+      this.speedMultiplier = 1;
+    }
+    setSpeedMultiplier(m) {
+      this.speedMultiplier = m || 1;
     }
     spawn(options) {
-      const { edgeId: edgeId2, tokenCfg, onArrive, delay = 0 } = options;
+      const { edgeId: edgeId2, tokenCfg, onArrive, delay = 0, reverse = false } = options;
       if (this.active.length >= this.maxParticles) return null;
       const path = this.edgeRenderer.getPath(edgeId2);
       if (!path) return null;
       const id = nextTokenId++;
-      const el = this._acquireElement(tokenCfg);
+      const cfg = { ...this.config.tokenDefault, ...tokenCfg };
+      const el = this._acquireElement(cfg);
       el.setAttribute("data-token-id", String(id));
       el.style.opacity = "0";
       this.layer.appendChild(el);
+      const edge = this.config.edgesById[edgeId2];
+      const speed = tokenCfg && tokenCfg.speed || (edge == null ? void 0 : edge.speed) || this.config.tokenDefault.speed || 120;
       const token = {
         id,
         edgeId: edgeId2,
         el,
-        tokenCfg: { ...this.config.tokenDefault, ...tokenCfg },
+        tokenCfg: cfg,
         progress: 0,
         delay,
         delayLeft: delay,
         onArrive,
-        onSpawn: options.onSpawn || null,
         path,
         done: false,
-        speed: tokenCfg && tokenCfg.speed || this.config.tokenDefault.speed || 120
+        speed,
+        reverse: !!reverse
       };
       placeTokenAt(token, 0);
-      if (token.onSpawn) token.onSpawn(token);
       this.active.push(token);
       this.edgeRenderer.setActive(edgeId2, true, token.tokenCfg.color);
       return token;
     }
     _acquireElement(tokenCfg) {
-      const cfg = { ...this.config.tokenDefault, ...tokenCfg };
       if (this.pool.length) {
         const el = this.pool.pop();
         el.className.baseVal = "fg-token";
-        updateTokenElement(el, cfg);
+        updateTokenElement(el, tokenCfg);
         return el;
       }
-      return createTokenShape(cfg);
+      return createTokenShape(tokenCfg);
     }
     _release(token) {
       token.el.remove();
@@ -2959,6 +3350,7 @@ var FlowGraph = (() => {
     update(dt2) {
       const edgeCounts = {};
       const toRemove = [];
+      const speedMul = this.speedMultiplier || 1;
       this.active.forEach((token) => {
         if (token.delayLeft > 0) {
           token.delayLeft -= dt2;
@@ -2966,7 +3358,7 @@ var FlowGraph = (() => {
         }
         token.el.style.opacity = "1";
         const pathLen = token.path.getTotalLength() || 1;
-        const dist = token.speed * (dt2 / 1e3);
+        const dist = token.speed * speedMul * (dt2 / 1e3);
         token.progress += dist / pathLen;
         if (token.progress >= 1) {
           token.progress = 1;
@@ -2989,539 +3381,81 @@ var FlowGraph = (() => {
       });
     }
     clear() {
-      this.active.slice().forEach((t) => this._release(t));
+      this.active.slice().forEach((t) => {
+        t.el.remove();
+        this.pool.push(t.el);
+      });
       this.active = [];
       Object.keys(this.edgeRenderer.edgeViews || {}).forEach((edgeId2) => {
         this.edgeRenderer.setActive(edgeId2, false);
       });
     }
-    countOnEdge(edgeId2) {
-      return this.active.filter((t) => t.edgeId === edgeId2).length;
+    travel(edgeId2, tokenCfg, reverse = false) {
+      return new Promise((resolve) => {
+        this.spawn({
+          edgeId: edgeId2,
+          tokenCfg,
+          reverse,
+          onArrive: () => resolve()
+        });
+      });
     }
   };
-  function spawnBurst(particles, edgeId2, burst, tokenCfg, onArrive, onSpawn) {
-    const count = (burst == null ? void 0 : burst.count) || 1;
-    const spacing = (burst == null ? void 0 : burst.spacing) || 60;
-    for (let i = 0; i < count; i++) {
-      particles.spawn({
-        edgeId: edgeId2,
-        tokenCfg,
-        onArrive,
-        onSpawn,
-        delay: i * spacing
-      });
-    }
-  }
 
-  // src/randomness.js
-  function applyJitter(base, jitter, enabled) {
-    if (!enabled || !jitter) return base;
-    const factor = 1 + (Math.random() * 2 - 1) * jitter;
-    return Math.max(1, Math.round(base * factor));
-  }
-  function percentile(sorted, p2) {
-    if (!sorted.length) return 0;
-    const idx = Math.ceil(p2 / 100 * sorted.length) - 1;
-    return sorted[Math.max(0, idx)];
-  }
-
-  // src/simulation.js
-  init_compose_pills();
-  init_admission();
-  var SimulationEngine = class {
-    constructor(config, hooks) {
-      this.config = config;
-      this.hooks = hooks;
-      this.running = false;
-      this.nodeState = {};
-      this.sourceTimers = {};
-      this.processTimers = {};
-      this.roundRobinIdx = {};
-      this.tokenStarted = {};
-      this.rtStart = null;
-      this._initState();
-    }
-    _initState() {
-      this.config.nodes.forEach((n) => {
-        this.nodeState[n.id] = {
-          buffer: 0,
-          bufferByEdge: {},
-          processing: false,
-          waiting: false,
-          flushing: false,
-          fill: 0,
-          slots: 0,
-          retries: 0,
-          rejects: 0,
-          received: 0,
-          waitSince: null,
-          circuitState: n.circuit ? "closed" : null,
-          failures: 0,
-          openSince: null
-        };
-        this.roundRobinIdx[n.id] = 0;
+  // src/node-stats.js
+  var NodeStats = class {
+    constructor(nodes) {
+      this.queue = {};
+      this.through = {};
+      nodes.forEach((n) => {
+        var _a, _b;
+        if ((_a = n.metrics) == null ? void 0 : _a.queue) this.queue[n.id] = 0;
+        if ((_b = n.metrics) == null ? void 0 : _b.count) this.through[n.id] = 0;
       });
-      this.rtStart = null;
-    }
-    _emit(event, payload) {
-      if (this.hooks.onEvent) this.hooks.onEvent(event, payload);
-    }
-    _refreshPills(nodeId) {
-      var _a, _b;
-      if (!this.hooks.onPills) return;
-      const node = this.config.nodesById[nodeId];
-      const state = this.nodeState[nodeId];
-      if (!node || !state) return;
-      const metricsSlice = ((_b = (_a = this.hooks).getNodeMetrics) == null ? void 0 : _b.call(_a, nodeId)) || { rejects: state.rejects };
-      this.hooks.onPills(nodeId, buildPillsBottom(node, state, metricsSlice));
-    }
-    _jitterDuration(ms) {
-      var _a;
-      const r = this.config.randomness;
-      return applyJitter(ms, (_a = r.duration) == null ? void 0 : _a.jitter, r.enabled);
-    }
-    start() {
-      if (this.running) return;
-      this.running = true;
-      this._emit("sim:start", {});
-      this.config.sources.forEach((src) => {
-        if (src.enabled === false) return;
-        const kick = () => {
-          this._fireSource(src);
-          this._scheduleSource(src);
-        };
-        if (src.delay > 0) {
-          this.sourceTimers[`${src.id}-delay`] = setTimeout(kick, src.delay);
-        } else {
-          kick();
-        }
-      });
-    }
-    pause() {
-      this.running = false;
-      Object.values(this.sourceTimers).forEach(clearTimeout);
-      Object.values(this.processTimers).forEach(clearTimeout);
-      this.sourceTimers = {};
-      this.processTimers = {};
-      this._emit("sim:pause", {});
     }
     reset() {
-      this.pause();
-      this._initState();
-      if (this.hooks.onReset) this.hooks.onReset();
-      this._emit("sim:reset", {});
-    }
-    patchNode(nodeId, node) {
-      if (!this.config.nodesById[nodeId]) return;
-      this.config.nodesById[nodeId] = node;
-    }
-    _evaluateCircuit(node, state) {
-      var _a, _b, _c;
-      const c = node.circuit;
-      if (!c) return;
-      const rate = (_a = c.failureRate) != null ? _a : 0.25;
-      const threshold = (_b = c.failureThreshold) != null ? _b : 5;
-      const recoveryMs = (_c = c.recoveryMs) != null ? _c : 8e3;
-      const now = Date.now();
-      if (state.circuitState === "open" && state.openSince && now - state.openSince >= recoveryMs) {
-        state.circuitState = "half-open";
-      }
-      if (state.circuitState === "open") {
-        this._refreshPills(node.id);
-        return;
-      }
-      const failed = Math.random() < rate;
-      if (failed) {
-        state.failures += 1;
-        if (this.hooks.onMetrics) this.hooks.onMetrics("reject", { nodeId: node.id });
-        if (state.failures >= threshold) {
-          state.circuitState = "open";
-          state.openSince = now;
-        }
-      } else {
-        state.failures = 0;
-        if (state.circuitState === "half-open") state.circuitState = "closed";
-      }
-      this._refreshPills(node.id);
-    }
-    _scheduleSource(src) {
-      if (!this.running) return;
-      const jitter = src.jitter ? (Math.random() * 2 - 1) * src.jitter * src.interval : 0;
-      const delay = Math.max(50, src.interval + jitter);
-      this.sourceTimers[src.id] = setTimeout(() => {
-        this._fireSource(src);
-        this._scheduleSource(src);
-      }, delay);
-    }
-    _fireSource(src) {
-      if (!this.running) return;
-      if (!this.rtStart) this.rtStart = Date.now();
-      this._emit("token:spawn", { sourceId: src.id, edgeId: src.edgeId });
-      if (this.hooks.spawnOnEdge) {
-        this.hooks.spawnOnEdge(src.edgeId, src.token, src.burst, (token) => {
-          this._handleArrive(src.edgeId, token);
-        });
-      }
-    }
-    emit(edgeId2, tokenCfg) {
-      if (!this.hooks.spawnOnEdge) return;
-      const edge = this.config.edgesById[edgeId2];
-      if (!edge) return;
-      this._emit("token:spawn", { edgeId: edgeId2, manual: true });
-      const token = { ...this.config.tokenDefault, ...tokenCfg };
-      this.hooks.spawnOnEdge(edgeId2, token, { count: 1, spacing: 0 }, (t) => {
-        this._handleArrive(edgeId2, t);
+      Object.keys(this.queue).forEach((id) => {
+        this.queue[id] = 0;
+      });
+      Object.keys(this.through).forEach((id) => {
+        this.through[id] = 0;
       });
     }
-    noteTokenSpawn(tokenId, edgeId2) {
-      this.tokenStarted[tokenId] = Date.now();
+    onArrive(nodeId) {
+      if (this.queue[nodeId] !== void 0) this.queue[nodeId] += 1;
+      if (this.through[nodeId] !== void 0) this.through[nodeId] += 1;
     }
-    _handleArrive(inEdgeId, token) {
-      const edge = this.config.edgesById[inEdgeId];
-      if (!edge) return;
-      const nodeId = edge.to;
-      const node = this.config.nodesById[nodeId];
-      if (!node) return;
-      if (this.tokenStarted[token == null ? void 0 : token.id]) delete this.tokenStarted[token == null ? void 0 : token.id];
-      const state = this.nodeState[nodeId];
-      if (this.hooks.onMetrics) this.hooks.onMetrics("arrive", { nodeId });
-      if (node.type === "port") {
-        this._handlePort(node, state, token, inEdgeId);
-        return;
-      }
-      const result = tryAdmit(node, state, inEdgeId);
-      if (result.overflow) {
-        this._overflow(node, state, token, inEdgeId);
-        return;
-      }
-      if (result.accumulating) {
-        this._emit("token:arrive", { nodeId, tokenId: token == null ? void 0 : token.id, edgeId: inEdgeId, accumulating: true });
-        this._refreshPills(nodeId);
-        return;
-      }
-      if (result.slots != null && this.hooks.onMetrics) {
-        this.hooks.onMetrics("queue", { nodeId, depth: result.slots });
-      }
-      this._emit("token:arrive", { nodeId, tokenId: token == null ? void 0 : token.id, edgeId: inEdgeId });
-      this._refreshPills(nodeId);
-      if (state.processing) return;
-      if (this._gateSatisfied(node, state)) {
-        state.waiting = false;
-        this._startProcess(node, state);
-      } else {
-        state.waiting = true;
-        if (this.hooks.onNodeWaiting) this.hooks.onNodeWaiting(nodeId);
-        this._refreshPills(nodeId);
+    onDepart(nodeId) {
+      if (this.queue[nodeId] !== void 0) {
+        this.queue[nodeId] = Math.max(0, this.queue[nodeId] - 1);
       }
     }
-    _handlePort(node, state, token, inEdgeId) {
-      this._emit("token:arrive", { nodeId: node.id, tokenId: token == null ? void 0 : token.id, edgeId: inEdgeId });
-      state.received += 1;
-      if (this.hooks.onMetrics) this.hooks.onMetrics("sink", { nodeId: node.id });
-      if (node.showReceived) this._refreshPills(node.id);
-      if (node.role === "terminal" && this.rtStart) {
-        const rt2 = Date.now() - this.rtStart;
-        this._emit("flow:complete", { nodeId: node.id, rtMs: rt2 });
-        if (this.hooks.onMetrics) this.hooks.onMetrics("flowComplete", { rtMs: rt2 });
-        this.rtStart = null;
-      }
-    }
-    _overflow(node, state, token, inEdgeId) {
+    pillsFor(nodeId, node) {
       var _a;
-      state.rejects += 1;
-      const rejectId = (_a = node.admission) == null ? void 0 : _a.rejectEdge;
-      if (rejectId) {
-        this._spawnReject(node, token, rejectId);
-      } else {
-        this._emit("token:drop", { nodeId: node.id, edgeId: inEdgeId, reason: "queue-full" });
-      }
-      if (this.hooks.onMetrics) this.hooks.onMetrics("reject", { nodeId: node.id });
-      this._refreshPills(node.id);
-    }
-    _spawnReject(node, token, rejectEdgeId) {
-      if (!rejectEdgeId || !this.hooks.spawnOnEdge) return;
-      const edge = this.config.edgesById[rejectEdgeId];
-      const tokenCfg = resolveTokenConfig(this.config, node, edge);
-      this._emit("token:reject", { nodeId: node.id, edgeId: rejectEdgeId });
-      this.hooks.spawnOnEdge(rejectEdgeId, tokenCfg, { count: 1, spacing: 0 }, (t) => {
-        this._handleArrive(rejectEdgeId, t);
-      });
-    }
-    _gateEdges(node) {
-      const gate = node.gate || { count: 1, from: "any" };
-      const incoming = this.config.incoming[node.id] || [];
-      if (Array.isArray(gate.from)) {
-        return incoming.filter((e) => gate.from.includes(e.id));
-      }
-      if (gate.from === "all-edges") {
-        return incoming.filter((e) => e.routing !== "loopback");
-      }
-      return incoming;
-    }
-    _gateSatisfied(node, state) {
-      const gate = node.gate || { count: 1, from: "any" };
-      const need = gate.count || 1;
-      if (gate.from === "all-edges" || Array.isArray(gate.from)) {
-        const inc = this._gateEdges(node);
-        return inc.length > 0 && inc.every((e) => (state.bufferByEdge[e.id] || 0) >= need);
-      }
-      return state.buffer >= need;
-    }
-    _consumeGate(node, state) {
-      const gate = node.gate || { count: 1, from: "any" };
-      const need = gate.count || 1;
-      if (gate.from === "all-edges" || Array.isArray(gate.from)) {
-        this._gateEdges(node).forEach((e) => {
-          state.bufferByEdge[e.id] = Math.max(0, (state.bufferByEdge[e.id] || 0) - need);
-        });
-      } else {
-        state.buffer = Math.max(0, state.buffer - need);
-      }
-    }
-    _startProcess(node, state) {
-      state.processing = true;
-      state.waiting = false;
-      state.waitSince = state.waitSince || Date.now();
-      this._consumeGate(node, state);
-      const duration = this._jitterDuration(node.duration || 800);
-      const isFast = duration < 400;
-      const effect = isFast ? "active" : "processing";
-      this._emit("node:process:start", { nodeId: node.id, effect });
-      if (this.hooks.onNodeProcessStart) this.hooks.onNodeProcessStart(node.id, effect);
-      this._refreshPills(node.id);
-      if (this.hooks.onMetrics) {
-        this.hooks.onMetrics("processStart", { nodeId: node.id, waitMs: state.waitSince ? Date.now() - state.waitSince : 0 });
-      }
-      const t0 = Date.now();
-      this.processTimers[node.id] = setTimeout(() => {
-        var _a;
-        state.processing = false;
-        state.waitSince = null;
-        const processMs = Date.now() - t0;
-        if (((_a = node.admission) == null ? void 0 : _a.mode) === "slot") releaseSlot(state);
-        state.flushing = false;
-        this._emit("node:process:end", { nodeId: node.id });
-        if (this.hooks.onNodeProcessEnd) this.hooks.onNodeProcessEnd(node.id);
-        if (this.hooks.onMetrics) this.hooks.onMetrics("processEnd", { nodeId: node.id, processMs });
-        this._refreshPills(node.id);
-        if (hasCircuit(node)) this._evaluateCircuit(node, state);
-        this._emitFromNode(node);
-        if (this._gateSatisfied(node, state)) {
-          this._startProcess(node, state);
-        } else if (state.buffer > 0 || Object.values(state.bufferByEdge).some((n) => n > 0)) {
-          state.waiting = true;
-          this._refreshPills(node.id);
-        }
-      }, duration);
-    }
-    _emitFromNode(node) {
-      const out = this._resolveOutgoing(node);
-      if (!out.length) return;
-      this._emit("node:emit", { nodeId: node.id });
-      if (this.hooks.onMetrics) this.hooks.onMetrics("emit", { nodeId: node.id });
-      const emitCfg = node.emit || { mode: "all", count: 1 };
-      if (emitCfg.mode === "weighted") {
-        const picked = this._pickWeighted(out);
-        if (picked) this._spawnOnEdge(picked, 1, node);
-        return;
-      }
-      if (emitCfg.mode === "round-robin") {
-        const idx = this.roundRobinIdx[node.id] % out.length;
-        this.roundRobinIdx[node.id] += 1;
-        this._spawnOnEdge(out[idx], emitCfg.count || 1, node);
-        return;
-      }
-      if (emitCfg.mode === "map" && emitCfg.map) {
-        Object.keys(emitCfg.map).forEach((edgeId2) => {
-          const e = this.config.edgesById[edgeId2];
-          if (e) this._spawnOnEdge(e, emitCfg.map[edgeId2], node);
-        });
-        return;
-      }
-      out.forEach((e) => this._spawnOnEdge(e, emitCfg.count || 1, node));
-    }
-    _resolveOutgoing(node) {
-      var _a, _b;
-      let out = [...this.config.outgoing[node.id] || []];
-      const emitCfg = node.emit || {};
-      const rejectId = (_a = node.admission) == null ? void 0 : _a.rejectEdge;
-      if (emitCfg.mode === "excludeReject" && rejectId) {
-        out = out.filter((e) => e.id !== rejectId);
-      }
-      if (emitCfg.mode === "map" && emitCfg.map) {
-        out = out.filter((e) => emitCfg.map[e.id] != null);
-      }
-      if (hasCircuit(node)) {
-        const c = node.circuit;
-        const st2 = ((_b = this.nodeState[node.id]) == null ? void 0 : _b.circuitState) || "closed";
-        if (st2 === "open" && c.fallbackEdge) {
-          const fb = this.config.edgesById[c.fallbackEdge];
-          return fb ? [fb] : out;
-        }
-        if (c.acceptEdge) {
-          const acc = this.config.edgesById[c.acceptEdge];
-          return acc ? [acc] : out;
+      if (!(node == null ? void 0 : node.metrics)) return [];
+      const pills = [];
+      const q2 = this.queue[nodeId];
+      if (q2 !== void 0) {
+        const max = (_a = node.metrics.queue) == null ? void 0 : _a.max;
+        if (max) {
+          const tone = q2 >= max ? "danger" : q2 > max * 0.7 ? "warning" : "primary";
+          pills.push({
+            text: `${q2}/${max}`,
+            tone,
+            progress: Math.min(1, q2 / max)
+          });
+        } else {
+          pills.push({ text: `q ${q2}`, tone: q2 > 0 ? "warning" : "primary" });
         }
       }
-      if (hasRetry(node)) {
-        const be = this.config.edgesById[node.retry.backEdge];
-        const st2 = this.nodeState[node.id];
-        if (st2 && st2.retries < (node.retry.maxRetries || 3) && be) {
-          st2.retries += 1;
-          this._refreshPills(node.id);
-          return [be];
-        }
+      const t = this.through[nodeId];
+      if (t !== void 0) {
+        pills.push({ text: `\u21B3 ${t}`, tone: "success" });
       }
-      return out;
+      return pills;
     }
-    _pickWeighted(edges) {
-      const weights = edges.map((e) => {
-        var _a;
-        return (_a = e.weight) != null ? _a : 1;
-      });
-      const total = weights.reduce((a, b) => a + b, 0);
-      let r = Math.random() * total;
-      for (let i = 0; i < edges.length; i++) {
-        r -= weights[i];
-        if (r <= 0) return edges[i];
-      }
-      return edges[edges.length - 1];
-    }
-    _spawnOnEdge(edge, count, fromNode) {
-      const n = count != null ? count : 1;
-      for (let i = 0; i < n; i++) {
-        if (!this.hooks.spawnOnEdge) continue;
-        const tokenCfg = resolveTokenConfig(this.config, fromNode, edge);
-        if (edge.speed) tokenCfg.speed = edge.speed;
-        this.hooks.spawnOnEdge(
-          edge.id,
-          tokenCfg,
-          { count: 1, spacing: i * 50 },
-          (token) => this._handleArrive(edge.id, token)
-        );
-      }
-    }
-  };
-
-  // src/metrics.js
-  var MetricsStore = class {
-    constructor(config) {
-      var _a, _b;
-      this.windowSec = (_b = (_a = config.metrics) == null ? void 0 : _a.windowSec) != null ? _b : 30;
-      this.nodes = {};
-      this.system = { rtSamples: [], throughput: [], rejects: 0, completed: 0, lastRt: null };
-      config.nodes.forEach((n) => {
-        this.nodes[n.id] = {
-          tokensIn: 0,
-          tokensOut: 0,
-          rejects: 0,
-          received: 0,
-          processTimes: [],
-          waitTimes: [],
-          emitSamples: [],
-          arriveSamples: [],
-          rejectSamples: [],
-          state: "idle",
-          queueDepth: 0
-        };
-      });
-    }
-    _trim(arr) {
-      const cutoff = Date.now() - this.windowSec * 1e3;
-      return arr.filter((x2) => x2.t >= cutoff);
-    }
-    recordArrive(nodeId) {
-      const m = this.nodes[nodeId];
-      if (m) {
-        m.tokensIn += 1;
-        m.queueDepth += 1;
-        m.arriveSamples.push({ t: Date.now(), v: 1 });
-        m.arriveSamples = this._trim(m.arriveSamples);
-      }
-    }
-    recordProcessStart(nodeId, waitMs) {
-      const m = this.nodes[nodeId];
-      if (!m) return;
-      m.state = "processing";
-      if (waitMs) {
-        m.waitTimes.push({ t: Date.now(), v: waitMs });
-        m.waitTimes = this._trim(m.waitTimes);
-      }
-    }
-    recordProcessEnd(nodeId, processMs) {
-      const m = this.nodes[nodeId];
-      if (!m) return;
-      m.state = "idle";
-      m.queueDepth = Math.max(0, m.queueDepth - 1);
-      if (processMs) {
-        m.processTimes.push({ t: Date.now(), v: processMs });
-        m.processTimes = this._trim(m.processTimes);
-      }
-    }
-    recordEmit(nodeId, count = 1) {
-      const m = this.nodes[nodeId];
-      if (!m) return;
-      m.tokensOut += count;
-      m.emitSamples.push({ t: Date.now(), v: count });
-      m.emitSamples = this._trim(m.emitSamples);
-    }
-    recordReject(nodeId) {
-      const m = this.nodes[nodeId];
-      if (m) {
-        m.rejects += 1;
-        m.rejectSamples.push({ t: Date.now(), v: 1 });
-        m.rejectSamples = this._trim(m.rejectSamples);
-      }
-      this.system.rejects += 1;
-    }
-    recordSink(nodeId) {
-      const m = this.nodes[nodeId];
-      if (m) {
-        m.received += 1;
-        m.tokensOut += 1;
-        m.queueDepth = Math.max(0, m.queueDepth - 1);
-      }
-    }
-    recordFlowComplete(rtMs) {
-      this.system.lastRt = rtMs;
-      this.system.completed += 1;
-      this.system.rtSamples.push({ t: Date.now(), v: rtMs });
-      this.system.rtSamples = this._trim(this.system.rtSamples);
-      this.system.throughput.push({ t: Date.now(), v: 1 });
-      this.system.throughput = this._trim(this.system.throughput);
-    }
-    setState(nodeId, state) {
-      if (this.nodes[nodeId]) this.nodes[nodeId].state = state;
-    }
-    setQueueDepth(nodeId, depth) {
-      if (this.nodes[nodeId]) this.nodes[nodeId].queueDepth = depth;
-    }
-    nodeStats(nodeId) {
-      const m = this.nodes[nodeId];
-      if (!m) return null;
-      const proc = m.processTimes.map((x2) => x2.v).sort((a, b) => a - b);
-      const wait = m.waitTimes.map((x2) => x2.v).sort((a, b) => a - b);
-      return {
-        ...m,
-        p50Process: percentile(proc, 50),
-        p90Process: percentile(proc, 90),
-        p99Process: percentile(proc, 99),
-        p50Wait: percentile(wait, 50)
-      };
-    }
-    systemStats() {
-      const rts = this.system.rtSamples.map((x2) => x2.v).sort((a, b) => a - b);
-      const span = this.windowSec || 30;
-      const tp = this.system.throughput.length / span;
-      return {
-        lastRt: this.system.lastRt,
-        completed: this.system.completed,
-        rejects: this.system.rejects,
-        throughput: Math.round(tp * 10) / 10,
-        p50Rt: percentile(rts, 50),
-        p90Rt: percentile(rts, 90),
-        p99Rt: percentile(rts, 99)
-      };
+    hasAutoMetrics() {
+      return Object.keys(this.queue).length > 0 || Object.keys(this.through).length > 0;
     }
   };
 
@@ -3554,7 +3488,13 @@ var FlowGraph = (() => {
     "rotate-ccw": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 3v6h6"/></svg>',
     "layout-grid": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
-    "circle-x": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>'
+    "circle-x": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>',
+    "skip-forward": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5v14l8-7-8-7zM19 5v14"/></svg>',
+    "footprints": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v2h4v-2H4zM10 8V6H6v2h4zM16 12v-2h-4v2h4zM19 16v2h-4v-2h4z"/></svg>',
+    "chevron-up": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>',
+    "chevron-down": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
+    "minimize-2": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>',
+    "grip-horizontal": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>'
   };
   function iconMarkup(name) {
     if (typeof window !== "undefined" && window.lucide) {
@@ -3567,6 +3507,157 @@ var FlowGraph = (() => {
     window.lucide.createIcons({ nodes: container.querySelectorAll("[data-lucide]") });
   }
 
+  // src/ui/step-controls.js
+  var SPEEDS = [1, 1.5, 2, 3, 5];
+  function updateModeButtons(instance) {
+    var _a;
+    const mode = instance.playbackMode || "play";
+    (_a = instance._modeBtns) == null ? void 0 : _a.forEach((btn) => {
+      const active = btn.dataset.mode === mode;
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+      btn.classList.toggle("fg-btn-mode-active", active);
+    });
+    if (instance._speedWrap) {
+      instance._speedWrap.hidden = mode === "narrative";
+    }
+  }
+  function mountModeControls(cluster, instance, config) {
+    var _a, _b;
+    if (((_a = config.controls) == null ? void 0 : _a.step) === false) return;
+    const wrap = document.createElement("div");
+    wrap.className = "fg-mode-switch";
+    wrap.setAttribute("role", "group");
+    wrap.setAttribute("aria-label", "Modo de reprodu\xE7\xE3o");
+    const modes = [
+      { id: "play", label: "Anima\xE7\xE3o cont\xEDnua", icon: "play" },
+      { id: "narrative", label: "Modo narrativa", icon: "book-open" },
+      { id: "step", label: "Passo a passo", icon: "footprints" }
+    ];
+    instance._modeBtns = [];
+    modes.forEach((m) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "fg-btn fg-btn-mode";
+      btn.dataset.mode = m.id;
+      btn.setAttribute("aria-label", m.label);
+      btn.innerHTML = iconMarkup(m.icon);
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (instance.playbackMode === m.id) return;
+        instance.setPlaybackMode(m.id);
+        if (m.id === "step" && !instance.running) instance.start();
+        if (m.id !== "step" && instance.running && !instance.player.players.some((p2) => p2.playing)) {
+          instance._startAutoPlayback();
+        }
+      });
+      wrap.appendChild(btn);
+      instance._modeBtns.push(btn);
+    });
+    cluster.appendChild(wrap);
+    if (((_b = config.controls) == null ? void 0 : _b.speed) !== false) {
+      const speedWrap = document.createElement("div");
+      speedWrap.className = "fg-speed-wrap";
+      const sel = document.createElement("select");
+      sel.className = "fg-speed-select";
+      sel.setAttribute("aria-label", "Velocidade da anima\xE7\xE3o");
+      SPEEDS.forEach((s) => {
+        const opt = document.createElement("option");
+        opt.value = String(s);
+        opt.textContent = `${s}\xD7`;
+        sel.appendChild(opt);
+      });
+      sel.value = String(instance.playSpeed || 1);
+      sel.addEventListener("change", (e) => {
+        e.stopPropagation();
+        instance.setPlaySpeed(parseFloat(sel.value, 10));
+      });
+      speedWrap.appendChild(sel);
+      cluster.appendChild(speedWrap);
+      instance._speedWrap = speedWrap;
+      instance._speedSelect = sel;
+    }
+    hydrateIcons(wrap);
+    updateModeButtons(instance);
+  }
+
+  // src/ui/fullscreen.js
+  function onEsc(instance, e) {
+    if (e.key === "Escape") closeFullscreen(instance);
+  }
+  function openFullscreen(instance) {
+    if (instance._fullscreenOpen) return;
+    const { container, root } = instance;
+    const overlay = document.createElement("div");
+    overlay.className = "fg-fullscreen-overlay";
+    const shell = document.createElement("div");
+    shell.className = "fg-fullscreen-shell";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "fg-btn fg-fullscreen-close";
+    closeBtn.setAttribute("aria-label", "Fechar tela cheia");
+    closeBtn.innerHTML = iconMarkup("circle-x");
+    closeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeFullscreen(instance);
+    });
+    const placeholder = document.createElement("div");
+    placeholder.className = "fg-fullscreen-placeholder";
+    placeholder.hidden = true;
+    container.insertBefore(placeholder, root);
+    shell.appendChild(closeBtn);
+    shell.appendChild(root);
+    overlay.appendChild(shell);
+    document.body.appendChild(overlay);
+    const prevHeight = root.style.height;
+    const prevMinHeight = root.style.minHeight;
+    root.style.height = "100%";
+    root.style.minHeight = "0";
+    root.classList.add("fg-fullscreen-root");
+    document.body.classList.add("fg-fullscreen-active");
+    instance._fullscreenOpen = true;
+    instance._fullscreenState = { overlay, shell, placeholder, prevHeight, prevMinHeight };
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeFullscreen(instance);
+    });
+    document.addEventListener("keydown", instance._fsEsc = (e) => onEsc(instance, e));
+    if (instance._fullscreenBtn) {
+      instance._fullscreenBtn.innerHTML = iconMarkup("minimize-2");
+      hydrateIcons(instance._fullscreenBtn);
+      instance._fullscreenBtn.setAttribute("aria-label", "Fechar tela cheia");
+    }
+    requestAnimationFrame(() => instance.fit());
+    hydrateIcons(closeBtn);
+  }
+  function closeFullscreen(instance) {
+    const state = instance._fullscreenState;
+    if (!state) return;
+    const { overlay, placeholder, prevHeight, prevMinHeight } = state;
+    const { root, container } = instance;
+    container.insertBefore(root, placeholder);
+    placeholder.remove();
+    overlay.remove();
+    root.style.height = prevHeight;
+    root.style.minHeight = prevMinHeight;
+    root.classList.remove("fg-fullscreen-root");
+    document.body.classList.remove("fg-fullscreen-active");
+    if (instance._fsEsc) {
+      document.removeEventListener("keydown", instance._fsEsc);
+      instance._fsEsc = null;
+    }
+    instance._fullscreenOpen = false;
+    instance._fullscreenState = null;
+    if (instance._fullscreenBtn) {
+      instance._fullscreenBtn.innerHTML = iconMarkup("maximize-2");
+      hydrateIcons(instance._fullscreenBtn);
+      instance._fullscreenBtn.setAttribute("aria-label", "Expandir diagrama");
+    }
+    requestAnimationFrame(() => instance.fit());
+  }
+  function toggleFullscreen(instance) {
+    if (instance._fullscreenOpen) closeFullscreen(instance);
+    else openFullscreen(instance);
+  }
+
   // src/ui/controls.js
   function makeBtn(className, label, iconName) {
     const btn = document.createElement("button");
@@ -3577,7 +3668,6 @@ var FlowGraph = (() => {
     return btn;
   }
   function createChrome(root, instance, config) {
-    var _a, _b, _c, _d;
     const chrome = document.createElement("div");
     chrome.className = "fg-chrome";
     const ctrls = config.controls || {};
@@ -3590,7 +3680,7 @@ var FlowGraph = (() => {
       header.appendChild(title);
       chrome.appendChild(header);
     }
-    const showToolbar = ctrls.toolbar !== false && (ctrls.playPause !== false || ctrls.zoomReset !== false || ctrls.reset !== false || ctrls.layout || ctrls.metricsDrawer !== false && ((_a = config.metrics) == null ? void 0 : _a.globalDrawer) !== false && ((_b = config.metrics) == null ? void 0 : _b.systemPanel) !== false);
+    const showToolbar = ctrls.toolbar !== false && (ctrls.playPause !== false || ctrls.step !== false || ctrls.fullscreen !== false || ctrls.zoomReset !== false || ctrls.reset !== false || ctrls.layout);
     if (!showToolbar && !chrome.childElementCount) {
       instance._chrome = null;
       return null;
@@ -3608,8 +3698,16 @@ var FlowGraph = (() => {
     cluster.className = "fg-controls-cluster";
     cluster.addEventListener("mousedown", (e) => e.stopPropagation());
     cluster.addEventListener("pointerdown", (e) => e.stopPropagation());
+    const modeWrap = document.createElement("div");
+    modeWrap.className = "fg-controls-group fg-controls-group-mode";
+    cluster.appendChild(modeWrap);
+    mountModeControls(modeWrap, instance, config);
+    const transportWrap = document.createElement("div");
+    transportWrap.className = "fg-controls-group fg-controls-group-transport";
+    const viewWrap = document.createElement("div");
+    viewWrap.className = "fg-controls-group fg-controls-group-view";
     if (ctrls.playPause !== false) {
-      const playBtn = makeBtn("fg-btn", "Play ou pausar simula\xE7\xE3o", "pause");
+      const playBtn = makeBtn("fg-btn", "Play ou pausar anima\xE7\xE3o", "pause");
       playBtn.setAttribute("aria-pressed", "true");
       playBtn.dataset.iconPlay = "play";
       playBtn.dataset.iconPause = "pause";
@@ -3618,52 +3716,55 @@ var FlowGraph = (() => {
         if (instance.running) instance.pause();
         else instance.start();
       });
-      cluster.appendChild(playBtn);
+      transportWrap.appendChild(playBtn);
       instance._playBtn = playBtn;
     }
+    if (ctrls.reset !== false) {
+      const resetBtn = makeBtn("fg-btn", "Reiniciar anima\xE7\xE3o", "rotate-ccw");
+      resetBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        instance.reset();
+      });
+      transportWrap.appendChild(resetBtn);
+    }
+    if (transportWrap.childElementCount) cluster.appendChild(transportWrap);
     if (ctrls.zoomReset !== false) {
       const fitBtn = makeBtn("fg-btn", "Centralizar diagrama", "crosshair");
       fitBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         instance.fit();
       });
-      cluster.appendChild(fitBtn);
+      viewWrap.appendChild(fitBtn);
     }
-    const metricsOn = ctrls.metricsDrawer !== false && ((_c = config.metrics) == null ? void 0 : _c.globalDrawer) !== false && ((_d = config.metrics) == null ? void 0 : _d.systemPanel) !== false;
-    if (metricsOn) {
-      const metricsBtn = makeBtn("fg-btn", "M\xE9tricas globais", "activity");
-      metricsBtn.setAttribute("aria-pressed", "false");
-      metricsBtn.addEventListener("click", (e) => {
-        var _a2;
-        e.preventDefault();
+    if (ctrls.fullscreen !== false) {
+      const fsBtn = makeBtn("fg-btn", "Expandir diagrama", "maximize-2");
+      fsBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        (_a2 = instance.toggleGlobalDrawer) == null ? void 0 : _a2.call(instance);
+        toggleFullscreen(instance);
       });
-      cluster.appendChild(metricsBtn);
-      instance._metricsBtn = metricsBtn;
+      viewWrap.appendChild(fsBtn);
+      instance._fullscreenBtn = fsBtn;
     }
     if (ctrls.layout) {
       const layoutBtn = makeBtn("fg-btn", "Auto-layout", "layout-grid");
       layoutBtn.addEventListener("click", (e) => {
-        var _a2;
+        var _a;
         e.stopPropagation();
-        (_a2 = instance.applyAutoLayout) == null ? void 0 : _a2.call(instance);
+        (_a = instance.applyAutoLayout) == null ? void 0 : _a.call(instance);
       });
-      cluster.appendChild(layoutBtn);
+      viewWrap.appendChild(layoutBtn);
     }
-    if (ctrls.reset !== false) {
-      const resetBtn = makeBtn("fg-btn", "Reiniciar simula\xE7\xE3o", "rotate-ccw");
-      resetBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        instance.reset();
-      });
-      cluster.appendChild(resetBtn);
-    }
+    if (viewWrap.childElementCount) cluster.appendChild(viewWrap);
     bar.appendChild(cluster);
-    chrome.appendChild(bar);
+    const dock = document.createElement("div");
+    dock.className = "fg-chrome-dock";
+    dock.appendChild(bar);
+    chrome.appendChild(dock);
     root.appendChild(chrome);
     instance._chrome = chrome;
+    instance._chromeDock = dock;
     hydrateIcons(chrome);
+    updateModeButtons(instance);
     return chrome;
   }
   function updatePlayButton(instance) {
@@ -3673,18 +3774,467 @@ var FlowGraph = (() => {
     instance._playBtn.innerHTML = iconMarkup(icon);
     hydrateIcons(instance._playBtn);
     instance._playBtn.setAttribute("aria-pressed", running ? "true" : "false");
-    instance._playBtn.setAttribute("aria-label", running ? "Pausar simula\xE7\xE3o" : "Iniciar simula\xE7\xE3o");
-  }
-  function syncGlobalMetricsButton(instance) {
-    var _a, _b;
-    if (!instance._metricsBtn) return;
-    const open = (_b = (_a = instance._globalDrawer) == null ? void 0 : _a.isOpen()) != null ? _b : false;
-    instance._metricsBtn.setAttribute("aria-pressed", open ? "true" : "false");
+    instance._playBtn.setAttribute("aria-label", running ? "Pausar anima\xE7\xE3o" : "Iniciar anima\xE7\xE3o");
   }
   function syncChromePinned(instance) {
-    var _a, _b, _c, _d, _e2;
-    const pinned = ((_b = (_a = instance._globalDrawer) == null ? void 0 : _a.isOpen()) != null ? _b : false) || ((_d = (_c = instance._nodeDrawer) == null ? void 0 : _c.isOpen()) != null ? _d : false);
-    (_e2 = instance.root) == null ? void 0 : _e2.classList.toggle("fg-chrome-pinned", pinned);
+    var _a;
+    (_a = instance.root) == null ? void 0 : _a.classList.toggle("fg-chrome-pinned", instance.playbackMode === "step");
+  }
+
+  // src/ui/step-bar.js
+  function mountStepBar(parent, instance, config) {
+    var _a;
+    if (((_a = config.controls) == null ? void 0 : _a.step) === false) return null;
+    const bar = document.createElement("div");
+    bar.className = "fg-step-bar";
+    bar.style.display = "none";
+    bar.setAttribute("role", "toolbar");
+    bar.setAttribute("aria-label", "Navega\xE7\xE3o passo a passo");
+    const trackWrap = document.createElement("div");
+    trackWrap.className = "fg-step-bar-tracks";
+    trackWrap.hidden = true;
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "fg-btn fg-step-prev";
+    prevBtn.setAttribute("aria-label", "Passo anterior");
+    prevBtn.innerHTML = `${iconMarkup("chevron-left")}<span>Voltar</span>`;
+    prevBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      instance.stepPrev();
+    });
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "fg-btn fg-step-next fg-step-next-btn";
+    nextBtn.setAttribute("aria-label", "Pr\xF3ximo passo");
+    nextBtn.innerHTML = `<span>Pr\xF3ximo</span>${iconMarkup("chevron-right")}`;
+    nextBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      instance.stepNext();
+    });
+    bar.appendChild(trackWrap);
+    bar.appendChild(prevBtn);
+    bar.appendChild(nextBtn);
+    parent.appendChild(bar);
+    instance._stepBar = {
+      el: bar,
+      trackWrap,
+      prevBtn,
+      nextBtn,
+      show() {
+        bar.style.display = "flex";
+      },
+      hide() {
+        bar.style.display = "none";
+      },
+      setTracks(tracks, activeId, onSelect) {
+        if (!tracks || tracks.length < 2) {
+          trackWrap.hidden = true;
+          trackWrap.innerHTML = "";
+          return;
+        }
+        trackWrap.hidden = false;
+        trackWrap.innerHTML = "";
+        tracks.forEach((t) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "fg-step-track-btn";
+          btn.textContent = t.label;
+          btn.setAttribute("aria-pressed", t.id === activeId ? "true" : "false");
+          if (t.id === activeId) btn.classList.add("fg-step-track-active");
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            onSelect(t.id);
+          });
+          trackWrap.appendChild(btn);
+        });
+      }
+    };
+    hydrateIcons(bar);
+    return instance._stepBar;
+  }
+  function updateStepBar(instance) {
+    const bar = instance._stepBar;
+    if (!bar) return;
+    const player = instance.player;
+    const active = player.activePlayer();
+    const remaining = Math.max(0, active.steps.length - active.stepIndex);
+    const animating = !!instance._stepping;
+    bar.prevBtn.disabled = animating || active.stepIndex <= 1;
+    bar.nextBtn.disabled = animating || remaining <= 0 && !instance.config.scenario.loop;
+    bar.nextBtn.classList.toggle("fg-step-next-busy", animating);
+    bar.setTracks(
+      player.tracks,
+      player.activeTrackId,
+      (id) => instance.setActiveTrack(id)
+    );
+  }
+
+  // src/ui/track-select.js
+  function mountTrackSelect(container, instance, { onSelect } = {}) {
+    const wrap = document.createElement("div");
+    wrap.className = "fg-track-select-wrap";
+    const label = document.createElement("label");
+    label.className = "fg-track-select-label";
+    label.textContent = "Cen\xE1rio";
+    const sel = document.createElement("select");
+    sel.className = "fg-track-select";
+    sel.setAttribute("aria-label", "Selecionar cen\xE1rio");
+    label.appendChild(sel);
+    wrap.appendChild(label);
+    sel.addEventListener("change", (e) => {
+      e.stopPropagation();
+      onSelect == null ? void 0 : onSelect(sel.value);
+    });
+    container.appendChild(wrap);
+    function sync() {
+      var _a, _b;
+      const tracks = ((_a = instance.player) == null ? void 0 : _a.tracks) || [];
+      const activeId = (_b = instance.player) == null ? void 0 : _b.activeTrackId;
+      const prev = sel.value;
+      sel.innerHTML = "";
+      tracks.forEach((t) => {
+        const opt = document.createElement("option");
+        opt.value = t.id;
+        opt.textContent = t.label;
+        sel.appendChild(opt);
+      });
+      if (tracks.length < 2) {
+        wrap.hidden = true;
+        return;
+      }
+      wrap.hidden = false;
+      sel.value = tracks.some((t) => t.id === prev) ? prev : activeId;
+    }
+    return { wrap, sel, sync };
+  }
+
+  // src/ui/narration-overlay.js
+  function mountNarrationOverlay(root, config, instance) {
+    var _a;
+    const narr = ((_a = config.scenario) == null ? void 0 : _a.narration) || {};
+    const el = document.createElement("div");
+    el.className = `fg-narration fg-narration-${narr.position || "top-left"}`;
+    el.hidden = true;
+    const titleEl = document.createElement("div");
+    titleEl.className = "fg-narration-title";
+    const descEl = document.createElement("div");
+    descEl.className = "fg-narration-desc";
+    const trackSlot = document.createElement("div");
+    trackSlot.className = "fg-narration-track-slot";
+    el.appendChild(titleEl);
+    el.appendChild(descEl);
+    el.appendChild(trackSlot);
+    root.appendChild(el);
+    if (narr.maxWidth) el.style.maxWidth = `${narr.maxWidth}px`;
+    let trackSelect = null;
+    if (instance) {
+      trackSelect = mountTrackSelect(trackSlot, instance, {
+        onSelect: (id) => instance.setActiveTrack(id)
+      });
+      trackSlot.hidden = true;
+    }
+    return {
+      el,
+      trackSelect,
+      set(title, description) {
+        titleEl.textContent = title || "";
+        descEl.textContent = description || "";
+        const hasText = !!(title || description);
+        const hasTracks = trackSelect && !trackSelect.wrap.hidden;
+        el.hidden = !hasText && !hasTracks;
+      },
+      show(v2) {
+        if (!v2) {
+          el.hidden = true;
+          return;
+        }
+        const hasText = !!(titleEl.textContent || descEl.textContent);
+        const hasTracks = trackSelect && !trackSelect.wrap.hidden;
+        el.hidden = !hasText && !hasTracks;
+      },
+      setTrackPickerVisible(visible) {
+        if (!trackSelect) return;
+        trackSlot.hidden = !visible;
+        trackSelect.sync();
+        const hasText = !!(titleEl.textContent || descEl.textContent);
+        el.hidden = !visible && !hasText;
+      },
+      syncTracks() {
+        trackSelect == null ? void 0 : trackSelect.sync();
+      }
+    };
+  }
+
+  // src/ui/narration-drawer.js
+  function formatKind(kind) {
+    const map = {
+      travel: "Deslocamento",
+      dwell: "Processamento",
+      setPill: "Estado",
+      setEffect: "Efeito",
+      narrate: "Narra\xE7\xE3o",
+      focus: "Foco"
+    };
+    return map[kind] || kind;
+  }
+  function buildNarrationItems(steps) {
+    const items = [];
+    if (!steps) return items;
+    steps.forEach((step, stepIndex) => {
+      if (step.kind === "parallel") {
+        step.parallel.forEach((sub, subIndex) => {
+          if (sub.kind === "wait") return;
+          items.push({
+            key: `${stepIndex}:${subIndex}`,
+            stepIndex,
+            subIndex,
+            title: sub.title || formatKind(sub.kind),
+            description: sub.description || ""
+          });
+        });
+        return;
+      }
+      if (step.kind === "wait") return;
+      items.push({
+        key: String(stepIndex),
+        stepIndex,
+        subIndex: -1,
+        title: step.title || formatKind(step.kind),
+        description: step.description || ""
+      });
+    });
+    return items;
+  }
+
+  // src/ui/scenario-panel.js
+  function attachDrag(panel, handle) {
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let origX = 0;
+    let origY = 0;
+    handle.addEventListener("pointerdown", (e) => {
+      var _a;
+      if (e.target.closest("button, select, label")) return;
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = panel.getBoundingClientRect();
+      const parent = ((_a = panel.offsetParent) == null ? void 0 : _a.getBoundingClientRect()) || { left: 0, top: 0 };
+      origX = rect.left - parent.left;
+      origY = rect.top - parent.top;
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      panel.style.left = `${origX + dx}px`;
+      panel.style.top = `${origY + dy}px`;
+      panel.style.right = "auto";
+    });
+    handle.addEventListener("pointerup", () => {
+      dragging = false;
+    });
+    handle.addEventListener("pointercancel", () => {
+      dragging = false;
+    });
+  }
+  function mountScenarioPanel(root, instance, config) {
+    var _a;
+    const narr = ((_a = config.scenario) == null ? void 0 : _a.narration) || {};
+    if (!narr.showOnCanvas) return null;
+    const panel = document.createElement("aside");
+    panel.className = "fg-scenario-panel";
+    panel.setAttribute("aria-label", "Painel do cen\xE1rio");
+    panel.hidden = true;
+    panel.style.top = "12px";
+    panel.style.right = "12px";
+    const header = document.createElement("div");
+    header.className = "fg-scenario-panel-header";
+    header.innerHTML = `
+    <span class="fg-scenario-panel-grip" aria-hidden="true">${iconMarkup("grip-horizontal")}</span>
+    <div class="fg-scenario-panel-heading">
+      <div class="fg-scenario-panel-title"></div>
+      <div class="fg-scenario-panel-sub">Roteiro</div>
+    </div>
+  `;
+    const list = document.createElement("div");
+    list.className = "fg-scenario-panel-list";
+    list.setAttribute("role", "list");
+    const footer = document.createElement("div");
+    footer.className = "fg-scenario-panel-footer";
+    const trackWrap = document.createElement("div");
+    trackWrap.className = "fg-scenario-panel-tracks";
+    let trackSelect = mountTrackSelect(trackWrap, instance, {
+      onSelect: (id) => instance.setActiveTrack(id)
+    });
+    const nav = document.createElement("div");
+    nav.className = "fg-scenario-panel-nav";
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "fg-scenario-nav-btn";
+    prevBtn.innerHTML = `${iconMarkup("chevron-left")} Voltar`;
+    prevBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      instance.stepPrev();
+    });
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "fg-scenario-nav-btn fg-scenario-nav-next";
+    nextBtn.innerHTML = `Pr\xF3ximo ${iconMarkup("chevron-right")}`;
+    nextBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      instance.stepNext();
+    });
+    nav.appendChild(prevBtn);
+    nav.appendChild(nextBtn);
+    footer.appendChild(trackWrap);
+    footer.appendChild(nav);
+    panel.appendChild(header);
+    panel.appendChild(list);
+    panel.appendChild(footer);
+    root.appendChild(panel);
+    const titleEl = header.querySelector(".fg-scenario-panel-title");
+    titleEl.textContent = config.title || "Cen\xE1rio";
+    attachDrag(panel, header);
+    hydrateIcons(panel);
+    const state = { items: [], activeIndex: -1, rowEls: [] };
+    function renderRows() {
+      list.innerHTML = "";
+      state.rowEls = state.items.map((item, i) => {
+        const row = document.createElement("div");
+        row.className = "fg-scenario-panel-item";
+        row.setAttribute("role", "listitem");
+        const title = document.createElement("div");
+        title.className = "fg-scenario-panel-item-title";
+        title.textContent = item.title;
+        const desc = document.createElement("div");
+        desc.className = "fg-scenario-panel-item-desc";
+        desc.textContent = item.description;
+        row.appendChild(title);
+        if (item.description) row.appendChild(desc);
+        list.appendChild(row);
+        return row;
+      });
+      applyStates();
+    }
+    function applyStates() {
+      state.rowEls.forEach((row, i) => {
+        row.classList.remove("fg-scenario-panel-item--past", "fg-scenario-panel-item--active", "fg-scenario-panel-item--future");
+        if (state.activeIndex < 0) row.classList.add("fg-scenario-panel-item--future");
+        else if (i < state.activeIndex) row.classList.add("fg-scenario-panel-item--past");
+        else if (i === state.activeIndex) row.classList.add("fg-scenario-panel-item--active");
+        else row.classList.add("fg-scenario-panel-item--future");
+      });
+      const activeRow = state.rowEls[state.activeIndex];
+      if (activeRow) activeRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    const api = {
+      el: panel,
+      footer,
+      prevBtn,
+      nextBtn,
+      trackWrap,
+      trackSelect,
+      setTrackSteps(steps) {
+        state.items = buildNarrationItems(steps);
+        state.activeIndex = -1;
+        renderRows();
+      },
+      setActiveIndex(index) {
+        if (!state.items.length) return;
+        state.activeIndex = Math.max(-1, Math.min(index, state.items.length - 1));
+        applyStates();
+      },
+      reset() {
+        state.activeIndex = -1;
+        applyStates();
+      },
+      show(visible, { stepMode = false } = {}) {
+        panel.hidden = !visible;
+        root.classList.toggle("fg-scenario-panel-open", !!visible && stepMode);
+        footer.hidden = !stepMode;
+        const chromeTitle = root.querySelector(".fg-chrome-header");
+        if (chromeTitle) chromeTitle.hidden = !!visible && stepMode;
+      },
+      setTracks() {
+        trackSelect.sync();
+      },
+      updateNav({ prevDisabled, nextDisabled, busy }) {
+        prevBtn.disabled = !!prevDisabled;
+        nextBtn.disabled = !!nextDisabled;
+        nextBtn.classList.toggle("fg-scenario-nav-busy", !!busy);
+      },
+      resolveIndex(step, meta) {
+        if ((meta == null ? void 0 : meta.parallelIndex) != null && (meta == null ? void 0 : meta.stepIndex) != null) {
+          const idx = state.items.findIndex(
+            (it2) => it2.stepIndex === meta.stepIndex && it2.subIndex === meta.parallelIndex
+          );
+          if (idx >= 0) return idx;
+        }
+        if ((meta == null ? void 0 : meta.stepIndex) != null) {
+          const idx = state.items.findIndex((it2) => it2.stepIndex === meta.stepIndex && it2.subIndex === -1);
+          if (idx >= 0) return idx;
+        }
+        if (step == null ? void 0 : step.title) {
+          const idx = state.items.findIndex((it2) => it2.title === step.title);
+          if (idx >= 0) return idx;
+        }
+        return Math.min(state.activeIndex + 1, state.items.length - 1);
+      }
+    };
+    return api;
+  }
+  function updateScenarioPanel(instance) {
+    const panel = instance._scenarioPanel;
+    if (!panel) return;
+    const player = instance.player;
+    const active = player.activePlayer();
+    const remaining = Math.max(0, active.steps.length - active.stepIndex);
+    const animating = !!instance._stepping;
+    panel.updateNav({
+      prevDisabled: animating || active.stepIndex <= 1,
+      nextDisabled: animating || remaining <= 0 && !instance.config.scenario.loop,
+      busy: animating
+    });
+    panel.setTracks();
+  }
+
+  // src/scenario-labels.js
+  function nodeLabel(config, nodeId) {
+    var _a;
+    if (!nodeId) return "";
+    return ((_a = config.nodesById[nodeId]) == null ? void 0 : _a.label) || nodeId;
+  }
+  function travelTitle(config, edgeId2) {
+    var _a;
+    const e = config.edgesById[edgeId2];
+    if (!e) return edgeId2;
+    const from = nodeLabel(config, e.from);
+    const to = nodeLabel(config, e.to);
+    const el = (_a = e.label) == null ? void 0 : _a.text;
+    return el ? `${from} \u2192 ${to} \xB7 ${el}` : `${from} \u2192 ${to}`;
+  }
+  function travelDescription(config, edgeId2, direction = "forward") {
+    var _a;
+    const e = config.edgesById[edgeId2];
+    if (!e) return "";
+    const from = nodeLabel(config, direction === "reverse" ? e.to : e.from);
+    const to = nodeLabel(config, direction === "reverse" ? e.from : e.to);
+    const el = (_a = e.label) == null ? void 0 : _a.text;
+    return el ? `Pacote viaja de ${from} para ${to} pela aresta \xAB${el}\xBB.` : `Pacote viaja de ${from} para ${to}.`;
+  }
+  function dwellTitle(config, nodeId) {
+    return `Em ${nodeLabel(config, nodeId)}`;
+  }
+  function dwellDescription(config, nodeId, effect) {
+    const name = nodeLabel(config, nodeId);
+    if (effect === "processing") return `Processando em ${name}.`;
+    if (effect === "waiting") return `Aguardando em ${name}.`;
+    if (effect === "open") return `Circuit breaker aberto em ${name}.`;
+    return `Ativo em ${name}.`;
   }
 
   // src/interaction/drag.js
@@ -3735,660 +4285,10 @@ var FlowGraph = (() => {
     });
   }
 
-  // src/ui/drawer.js
-  function blockCanvasPointer(el) {
-    el.addEventListener("mousedown", (e) => e.stopPropagation());
-    el.addEventListener("pointerdown", (e) => e.stopPropagation());
-  }
-  function createDrawer(root, options = {}) {
-    var _a, _b;
-    const {
-      id,
-      side = "right",
-      width = 300,
-      title = "",
-      tabs = [],
-      onClose,
-      onOpen
-    } = options;
-    const backdrop = document.createElement("div");
-    backdrop.className = "fg-drawer-backdrop";
-    backdrop.setAttribute("aria-hidden", "true");
-    const drawer = document.createElement("aside");
-    drawer.className = `fg-drawer fg-drawer-${side}`;
-    drawer.style.setProperty("--fg-drawer-width", `${width}px`);
-    drawer.setAttribute("role", "dialog");
-    drawer.setAttribute("aria-modal", "true");
-    drawer.setAttribute("aria-hidden", "true");
-    if (id) drawer.id = id;
-    const header = document.createElement("div");
-    header.className = "fg-drawer-header";
-    const titleEl = document.createElement("h3");
-    titleEl.className = "fg-drawer-title";
-    titleEl.textContent = title;
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.className = "fg-btn fg-btn-ghost fg-drawer-close";
-    closeBtn.setAttribute("aria-label", "Fechar painel");
-    closeBtn.innerHTML = iconMarkup("x");
-    header.appendChild(titleEl);
-    header.appendChild(closeBtn);
-    const tabBar = document.createElement("div");
-    tabBar.className = "fg-drawer-tabs";
-    tabBar.setAttribute("role", "tablist");
-    const bodies = {};
-    tabs.forEach((tab, i) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "fg-drawer-tab";
-      btn.setAttribute("role", "tab");
-      btn.dataset.tab = tab.id;
-      btn.textContent = tab.label;
-      btn.setAttribute("aria-selected", i === 0 ? "true" : "false");
-      tabBar.appendChild(btn);
-      const panel = document.createElement("div");
-      panel.className = "fg-drawer-panel";
-      panel.dataset.tab = tab.id;
-      panel.setAttribute("role", "tabpanel");
-      panel.hidden = i !== 0;
-      bodies[tab.id] = panel;
-    });
-    const bodyWrap = document.createElement("div");
-    bodyWrap.className = "fg-drawer-body";
-    Object.values(bodies).forEach((p2) => bodyWrap.appendChild(p2));
-    drawer.appendChild(header);
-    if (tabs.length > 1) drawer.appendChild(tabBar);
-    drawer.appendChild(bodyWrap);
-    root.appendChild(backdrop);
-    root.appendChild(drawer);
-    blockCanvasPointer(drawer);
-    blockCanvasPointer(backdrop);
-    let activeTab = ((_a = tabs[0]) == null ? void 0 : _a.id) || null;
-    let openState = false;
-    function setTab(tabId) {
-      activeTab = tabId;
-      tabBar.querySelectorAll(".fg-drawer-tab").forEach((b) => {
-        const on2 = b.dataset.tab === tabId;
-        b.classList.toggle("fg-drawer-tab-active", on2);
-        b.setAttribute("aria-selected", on2 ? "true" : "false");
-      });
-      Object.entries(bodies).forEach(([tid, panel]) => {
-        panel.hidden = tid !== tabId;
-      });
-    }
-    tabBar.querySelectorAll(".fg-drawer-tab").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        setTab(btn.dataset.tab);
-      });
-    });
-    if (tabs[0]) {
-      (_b = tabBar.querySelector(".fg-drawer-tab")) == null ? void 0 : _b.classList.add("fg-drawer-tab-active");
-    }
-    function open() {
-      if (openState) return;
-      openState = true;
-      backdrop.setAttribute("aria-hidden", "false");
-      drawer.setAttribute("aria-hidden", "false");
-      backdrop.classList.add("fg-drawer-open");
-      drawer.classList.add("fg-drawer-open");
-      hydrateIcons(drawer);
-      if (onOpen) onOpen();
-    }
-    function close() {
-      if (!openState) return;
-      openState = false;
-      backdrop.classList.remove("fg-drawer-open");
-      drawer.classList.remove("fg-drawer-open");
-      backdrop.setAttribute("aria-hidden", "true");
-      drawer.setAttribute("aria-hidden", "true");
-      if (onClose) onClose();
-    }
-    closeBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      close();
-    });
-    backdrop.addEventListener("click", (e) => {
-      if (e.target !== backdrop) return;
-      e.stopPropagation();
-      close();
-    });
-    return {
-      el: drawer,
-      backdrop,
-      open,
-      close,
-      setTitle(text) {
-        titleEl.textContent = text;
-      },
-      setTab,
-      getActiveTab: () => activeTab,
-      panel(tabId) {
-        return bodies[tabId];
-      },
-      isOpen: () => openState
-    };
-  }
-
-  // src/charts.js
-  function renderSparkline(samples, options = {}) {
-    var _a, _b, _c, _d, _e2, _f, _g, _h;
-    const width = (_a = options.width) != null ? _a : 280;
-    const height = (_b = options.height) != null ? _b : 48;
-    const color = (_c = options.color) != null ? _c : "#7C3AED";
-    const fill = (_d = options.fill) != null ? _d : `color-mix(in srgb, ${color} 12%, transparent)`;
-    const label = (_e2 = options.label) != null ? _e2 : "";
-    const unit = (_f = options.unit) != null ? _f : "";
-    if (!(samples == null ? void 0 : samples.length)) {
-      return `
-      <div class="fg-sparkline-wrap">
-        ${label ? `<div class="fg-sparkline-label">${label}</div>` : ""}
-        <svg class="fg-sparkline fg-sparkline-empty" width="${width}" height="${height}" aria-hidden="true">
-          <line x1="0" y1="${height / 2}" x2="${width}" y2="${height / 2}" stroke="currentColor" stroke-opacity="0.15"/>
-        </svg>
-        <span class="fg-sparkline-empty-text">Sem dados ainda</span>
-      </div>`;
-    }
-    const values = samples.map((s) => s.v);
-    let min = (_g = options.min) != null ? _g : Math.min(...values);
-    let max = (_h = options.max) != null ? _h : Math.max(...values);
-    if (min === max) {
-      min -= 1;
-      max += 1;
-    }
-    const pad = 4;
-    const innerW = width - pad * 2;
-    const innerH = height - pad * 2;
-    const pts = values.map((v2, i) => {
-      const x2 = pad + i / Math.max(1, values.length - 1) * innerW;
-      const y = pad + innerH - (v2 - min) / (max - min) * innerH;
-      return `${x2.toFixed(1)},${y.toFixed(1)}`;
-    });
-    const last = values[values.length - 1];
-    const area = `${pad},${height - pad} ${pts.join(" ")} ${width - pad},${height - pad}`;
-    return `
-    <div class="fg-sparkline-wrap">
-      ${label ? `<div class="fg-sparkline-label">${label}<span class="fg-sparkline-last">${last}${unit ? ` ${unit}` : ""}</span></div>` : ""}
-      <svg class="fg-sparkline" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${label || "sparkline"}">
-        <polygon class="fg-sparkline-area" points="${area}" fill="${fill}" />
-        <polyline class="fg-sparkline-line" points="${pts.join(" ")}" fill="none" stroke="${color}" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round"/>
-      </svg>
-    </div>`;
-  }
-  function bucketBySecond(samples, windowSec = 30) {
-    if (!(samples == null ? void 0 : samples.length)) return [];
-    const now = Date.now();
-    const start = now - windowSec * 1e3;
-    const buckets = {};
-    samples.forEach((s) => {
-      var _a;
-      if (s.t < start) return;
-      const sec = Math.floor((s.t - start) / 1e3);
-      buckets[sec] = (buckets[sec] || 0) + ((_a = s.v) != null ? _a : 1);
-    });
-    const maxSec = Math.floor((now - start) / 1e3);
-    const out = [];
-    for (let i = 0; i <= maxSec; i += 1) {
-      out.push({ t: start + i * 1e3, v: buckets[i] || 0 });
-    }
-    return out;
-  }
-
-  // src/ui/node-metrics.js
-  init_admission();
-  function emitModeLabel(node) {
-    const emit = node.emit || { mode: "all" };
-    if (emit.mode === "weighted") return "weighted";
-    if (emit.mode === "round-robin") return "round-robin";
-    if (emit.mode === "map") return "map";
-    if (emit.mode === "excludeReject") return "exclude reject";
-    return emit.mode || "all";
-  }
-  function gateLabel(node) {
-    const gate = node.gate || {};
-    if (Array.isArray(gate.from)) return `${gate.from.length} edges`;
-    if (gate.from === "all-edges") return `all edges \xD7${gate.count || 1}`;
-    return `count \xD7${gate.count || 1}`;
-  }
-  function ratePerSec(samples, windowSec) {
-    if (!(samples == null ? void 0 : samples.length)) return 0;
-    return Math.round(samples.length / (windowSec || 30) * 10) / 10;
-  }
-  function fmtMs(v2) {
-    return v2 != null && v2 !== "" ? `${v2} ms` : "\u2014";
-  }
-  function buildNodeInfoRows(node, stats, config) {
-    var _a, _b, _c, _d, _e2, _f, _g;
-    if (!node || !stats) return [];
-    const rows = [["Estado", stats.state]];
-    if (node.type === "port") {
-      if (node.role === "source") {
-        const src = (_a = config.sources) == null ? void 0 : _a.find((s) => {
-          const edge = config.edgesById[s.edgeId];
-          return (edge == null ? void 0 : edge.from) === node.id;
-        });
-        rows.push(["Emitidos", String(stats.tokensOut)]);
-        if (src) {
-          rows.push(["Intervalo", `${src.interval} ms`]);
-          if (((_b = src.burst) == null ? void 0 : _b.count) > 1) {
-            rows.push(["Burst", `${src.burst.count} / ${src.burst.spacing}ms`]);
-          }
-        }
-      } else {
-        rows.push(["Recebidos", String((_c = stats.received) != null ? _c : stats.tokensIn)]);
-        rows.push(["Entrada", String(stats.tokensIn)]);
-      }
-      return rows;
-    }
-    const mode = admissionMode(node);
-    if (mode === "slot") {
-      rows.push(["Ocupa\xE7\xE3o", `${stats.queueDepth} / ${admissionMax(node)}`]);
-      rows.push(["Entrada / Sa\xEDda", `${stats.tokensIn} / ${stats.tokensOut}`]);
-      if ((_d = node.admission) == null ? void 0 : _d.rejectEdge) rows.push(["Rejeitados", String(stats.rejects)]);
-    } else if (mode === "batch") {
-      rows.push(["Batch max", String((_e2 = admissionMax(node)) != null ? _e2 : "\u2014")]);
-      rows.push(["Entrada / Sa\xEDda", `${stats.tokensIn} / ${stats.tokensOut}`]);
-    } else if (isJoinGate(node)) {
-      rows.push(["Gate", gateLabel(node)]);
-      rows.push(["Entrada / Sa\xEDda", `${stats.tokensIn} / ${stats.tokensOut}`]);
-      rows.push(["Aguardando", String(stats.queueDepth)]);
-    } else {
-      rows.push(["Entrada / Sa\xEDda", `${stats.tokensIn} / ${stats.tokensOut}`]);
-      rows.push(["Fila", String(stats.queueDepth)]);
-      const max = admissionMax(node);
-      if (max != null) rows.push(["Queue max", String(max)]);
-      if ((_f = node.admission) == null ? void 0 : _f.rejectEdge) rows.push(["Rejeitados", String(stats.rejects)]);
-    }
-    if (hasCircuit(node)) {
-      rows.push(["Circuito", (stats.circuitState || "closed").toUpperCase()]);
-      rows.push(["Falhas", String(stats.rejects)]);
-    }
-    if (hasRetry(node)) {
-      rows.push(["Max retries", String((_g = node.retry.maxRetries) != null ? _g : 3)]);
-    }
-    if (emitModeLabel(node) !== "all") {
-      rows.push(["Emit", emitModeLabel(node)]);
-    }
-    return rows;
-  }
-  function buildNodeMetricRows(node, stats, config) {
-    var _a, _b, _c;
-    if (!node || !stats) return [];
-    const windowSec = (_b = (_a = config.metrics) == null ? void 0 : _a.windowSec) != null ? _b : 30;
-    const rows = [];
-    if (node.type === "port" && node.role === "source") {
-      rows.push(["Taxa emit", `${ratePerSec(stats.emitSamples, windowSec)}/s`]);
-      rows.push(["Total emit", String(stats.tokensOut)]);
-      return rows;
-    }
-    if (node.type === "port") {
-      rows.push(["Taxa receb", `${ratePerSec(stats.arriveSamples, windowSec)}/s`]);
-      rows.push(["Total receb", String((_c = stats.received) != null ? _c : stats.tokensIn)]);
-      return rows;
-    }
-    rows.push(["p50 process", fmtMs(stats.p50Process)]);
-    rows.push(["p90 process", fmtMs(stats.p90Process)]);
-    rows.push(["p50 wait", fmtMs(stats.p50Wait)]);
-    if (admissionMode(node) === "slot") {
-      rows.push(["Rejeitados", String(stats.rejects)]);
-    }
-    rows.push(["Taxa sa\xEDda", `${ratePerSec(stats.emitSamples, windowSec)}/s`]);
-    rows.push(["Emit mode", emitModeLabel(node)]);
-    return rows;
-  }
-  function buildNodeCharts(node, stats, config) {
-    var _a, _b, _c, _d, _e2, _f, _g, _h, _i, _j, _k;
-    if (((_a = config.metrics) == null ? void 0 : _a.charts) === false || !stats) return "";
-    const windowSec = (_c = (_b = config.metrics) == null ? void 0 : _b.windowSec) != null ? _c : 30;
-    const primary = (_e2 = (_d = config.theme) == null ? void 0 : _d.primary) != null ? _e2 : "#7C3AED";
-    const success = (_g = (_f = config.theme) == null ? void 0 : _f.success) != null ? _g : "#3D6B52";
-    const warning = (_i = (_h = config.theme) == null ? void 0 : _h.warning) != null ? _i : "#D97706";
-    const danger = (_k = (_j = config.theme) == null ? void 0 : _j.danger) != null ? _k : "#9B1C1C";
-    const parts = [];
-    if (node.type === "port" && node.role === "source") {
-      parts.push(renderSparkline(
-        bucketBySecond(stats.emitSamples || [], windowSec),
-        { label: "Emiss\xF5es / s", unit: "/s", color: primary, width: 268, height: 52 }
-      ));
-      return parts.map((p2) => `<div class="fg-panel-section">${p2}</div>`).join("");
-    }
-    if (node.type === "port") {
-      parts.push(renderSparkline(
-        bucketBySecond(stats.arriveSamples || [], windowSec),
-        { label: "Recebidos / s", unit: "/s", color: success, width: 268, height: 52 }
-      ));
-      return parts.map((p2) => `<div class="fg-panel-section">${p2}</div>`).join("");
-    }
-    parts.push(renderSparkline(stats.processTimes || [], {
-      label: "Process time",
-      unit: "ms",
-      color: primary,
-      width: 268,
-      height: 52
-    }));
-    parts.push(renderSparkline(stats.waitTimes || [], {
-      label: "Wait time",
-      unit: "ms",
-      color: warning,
-      width: 268,
-      height: 52
-    }));
-    parts.push(renderSparkline(
-      bucketBySecond(stats.emitSamples || [], windowSec),
-      { label: "Emiss\xF5es / s", unit: "/s", color: success, width: 268, height: 52 }
-    ));
-    if (admissionMode(node) === "slot") {
-      parts.push(renderSparkline(
-        bucketBySecond(stats.rejectSamples || [], windowSec),
-        { label: "Rejei\xE7\xF5es / s", unit: "/s", color: danger, width: 268, height: 52 }
-      ));
-    }
-    return parts.map((p2) => `<div class="fg-panel-section">${p2}</div>`).join("");
-  }
-
-  // src/ui/inspector.js
-  function renderInspectorForm(node, config) {
-    var _a, _b, _c, _d, _e2, _f, _g, _h, _i, _j, _k, _l, _m, _n2, _o, _p, _q, _r, _s;
-    const fields = [];
-    if (node.type === "process") {
-      fields.push(numField("duration", "Duration (ms)", node.duration));
-      const mode = ((_a = node.admission) == null ? void 0 : _a.mode) || "queue";
-      fields.push(selectField("admissionMode", "Admission", mode, [
-        { value: "queue", label: "queue (FIFO)" },
-        { value: "slot", label: "slot (sem\xE1foro)" },
-        { value: "batch", label: "batch (micro-batch)" }
-      ]));
-      if (mode === "queue") {
-        fields.push(numField("queueMax", "Queue max (vazio = \u221E)", (_c = (_b = node.admission) == null ? void 0 : _b.max) != null ? _c : "", 1, 0));
-      }
-      if (mode === "slot") {
-        fields.push(numField("capacity", "Capacity", (_e2 = (_d = node.admission) == null ? void 0 : _d.max) != null ? _e2 : 2));
-      }
-      if (mode === "batch") {
-        fields.push(numField("batchMax", "Batch size", (_g = (_f = node.admission) == null ? void 0 : _f.max) != null ? _g : 10));
-        fields.push(numField("batchStep", "Step", (_i = (_h = node.admission) == null ? void 0 : _h.step) != null ? _i : 1));
-      }
-      if (mode === "queue" || mode === "slot") {
-        fields.push(textField("rejectEdge", "Reject edge id", (_k = (_j = node.admission) == null ? void 0 : _j.rejectEdge) != null ? _k : ""));
-      }
-      if (isJoinGate2(node)) {
-        const gateMode = ((_l = node.gate) == null ? void 0 : _l.from) === "all-edges" ? "all" : "count";
-        fields.push(selectField("gateMode", "Gate sync", gateMode, [
-          { value: "count", label: "count" },
-          { value: "all", label: "all edges" }
-        ]));
-        fields.push(numField("gateCount", "Gate count", (_n2 = (_m = node.gate) == null ? void 0 : _m.count) != null ? _n2 : 1));
-      }
-      if (((_o = node.emit) == null ? void 0 : _o.mode) === "weighted") {
-        (config.outgoing[node.id] || []).forEach((edge) => {
-          var _a2, _b2;
-          fields.push(numField(`weight_${edge.id}`, `Weight \xB7 ${((_a2 = edge.label) == null ? void 0 : _a2.text) || edge.id}`, (_b2 = edge.weight) != null ? _b2 : 1));
-        });
-      }
-      if (node.retry) {
-        fields.push(numField("maxRetries", "Max retries", (_p = node.retry.maxRetries) != null ? _p : 3));
-      }
-      if (node.circuit) {
-        fields.push(numField("failureRate", "Failure rate (0\u20131)", (_q = node.circuit.failureRate) != null ? _q : 0.25, 0.01, 0, 1));
-        fields.push(numField("failureThreshold", "Trip threshold", (_r = node.circuit.failureThreshold) != null ? _r : 5));
-        fields.push(numField("recoveryMs", "Recovery (ms)", (_s = node.circuit.recoveryMs) != null ? _s : 8e3));
-      }
-    }
-    if (node.type === "port") {
-      fields.push(checkField("showReceived", "Show received pill", node.showReceived));
-    }
-    if (!fields.length) {
-      return '<p class="fg-muted fg-panel-placeholder">Nenhum par\xE2metro edit\xE1vel para este tipo.</p>';
-    }
-    return `
-    <form class="fg-inspector-form">
-      ${fields.join("")}
-      <button type="submit" class="fg-inspector-apply">Aplicar</button>
-    </form>`;
-  }
-  function isJoinGate2(node) {
-    var _a;
-    const from = (_a = node.gate) == null ? void 0 : _a.from;
-    return from === "all-edges" || Array.isArray(from);
-  }
-  function numField(name, label, value, step = 1, min = 0, max = null) {
-    const maxAttr = max != null ? `max="${max}"` : "";
-    return `
-    <label class="fg-field">
-      <span class="fg-field-label">${label}</span>
-      <input class="fg-field-input" type="number" name="${name}" value="${value != null ? value : ""}" step="${step}" min="${min}" ${maxAttr} />
-    </label>`;
-  }
-  function textField(name, label, value) {
-    return `
-    <label class="fg-field">
-      <span class="fg-field-label">${label}</span>
-      <input class="fg-field-input" type="text" name="${name}" value="${value != null ? value : ""}" />
-    </label>`;
-  }
-  function selectField(name, label, value, options) {
-    const opts = options.map((o) => `<option value="${o.value}"${o.value === value ? " selected" : ""}>${o.label}</option>`).join("");
-    return `
-    <label class="fg-field">
-      <span class="fg-field-label">${label}</span>
-      <select class="fg-field-input" name="${name}">${opts}</select>
-    </label>`;
-  }
-  function checkField(name, label, checked) {
-    return `
-    <label class="fg-field fg-field-check">
-      <input type="checkbox" name="${name}"${checked ? " checked" : ""} />
-      <span class="fg-field-label">${label}</span>
-    </label>`;
-  }
-  function readInspectorPatch(form, node) {
-    const fd = new FormData(form);
-    const patch = {};
-    if (fd.has("duration")) patch.duration = Number(fd.get("duration"));
-    if (fd.has("admissionMode")) {
-      const mode = fd.get("admissionMode");
-      const admission = { mode, step: 1, rejectEdge: fd.get("rejectEdge") || null };
-      if (mode === "queue") {
-        const raw = fd.get("queueMax");
-        admission.max = raw === "" ? null : Number(raw);
-      }
-      if (mode === "slot") admission.max = Number(fd.get("capacity") || 2);
-      if (mode === "batch") {
-        admission.max = Number(fd.get("batchMax") || 10);
-        admission.step = Number(fd.get("batchStep") || 1);
-      }
-      patch.admission = admission;
-    }
-    if (fd.has("gateMode") || fd.has("gateCount")) {
-      patch.gate = {
-        mode: fd.get("gateMode") || "count",
-        count: Number(fd.get("gateCount") || 1)
-      };
-    }
-    if (fd.has("maxRetries")) {
-      patch.retry = { ...node.retry, maxRetries: Number(fd.get("maxRetries")) };
-    }
-    if (fd.has("failureRate")) {
-      patch.circuit = {
-        failureRate: Number(fd.get("failureRate")),
-        failureThreshold: Number(fd.get("failureThreshold")),
-        recoveryMs: Number(fd.get("recoveryMs"))
-      };
-    }
-    if (form.querySelector('[name="showReceived"]')) {
-      patch.showReceived = fd.get("showReceived") === "on";
-    }
-    const weights = {};
-    fd.forEach((val, key) => {
-      if (key.startsWith("weight_")) weights[key.slice(7)] = Number(val);
-    });
-    if (Object.keys(weights).length) patch.weights = weights;
-    return patch;
-  }
-  function bindInspectorForm(form, instance, nodeId, onApplied) {
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const node = instance.config.nodesById[nodeId];
-      if (!node) return;
-      instance.updateNode(nodeId, readInspectorPatch(form, node));
-      if (onApplied) onApplied();
-    });
-  }
-
-  // src/ui/panels.js
-  function statCard(label, value) {
-    return `<div class="fg-stat-card"><span class="fg-stat-label">${label}</span><span class="fg-stat-value">${value}</span></div>`;
-  }
-  function statsGrid(rows) {
-    if (!rows.length) return '<p class="fg-muted fg-panel-placeholder">Sem m\xE9tricas para este n\xF3.</p>';
-    return `<div class="fg-stat-grid">${rows.map(([l, v2]) => statCard(l, v2)).join("")}</div>`;
-  }
-  function fmtMs2(v2) {
-    return v2 != null && v2 !== "" ? `${v2} ms` : "\u2014";
-  }
-  function renderConfigTab(instance, nodeId) {
-    const drawer = instance._nodeDrawer;
-    if (!drawer) return;
-    const configTab = drawer.panel("config");
-    const node = instance.config.nodesById[nodeId];
-    if (!configTab || !node) return;
-    configTab.innerHTML = renderInspectorForm(node, instance.config);
-    const form = configTab.querySelector(".fg-inspector-form");
-    if (form) bindInspectorForm(form, instance, nodeId, () => renderConfigTab(instance, nodeId));
-  }
-  function renderNodePanelContent(instance, nodeId, options = {}) {
-    const { refreshConfig = true } = options;
-    const drawer = instance._nodeDrawer;
-    if (!drawer || !instance.metrics) return;
-    const node = instance.config.nodesById[nodeId];
-    const stats = instance.metrics.nodeStats(nodeId);
-    if (!node || !stats) return;
-    const cfg = instance.config;
-    drawer.setTitle(node.label || node.id);
-    const info = drawer.panel("info");
-    if (info) {
-      info.innerHTML = `
-      <p class="fg-muted fg-drawer-subtitle">${node.type}${node.role ? ` \xB7 ${node.role}` : ""}</p>
-      ${statsGrid(buildNodeInfoRows(node, stats, cfg))}
-    `;
-    }
-    const metricsTab = drawer.panel("metrics");
-    if (metricsTab) {
-      const rows = buildNodeMetricRows(node, stats, cfg);
-      metricsTab.innerHTML = statsGrid(rows) + buildNodeCharts(node, stats, cfg);
-    }
-    if (refreshConfig) renderConfigTab(instance, nodeId);
-  }
-  function mountGlobalDrawer(root, instance, config) {
-    var _a, _b;
-    if (((_a = config.metrics) == null ? void 0 : _a.globalDrawer) === false || ((_b = config.metrics) == null ? void 0 : _b.systemPanel) === false) return null;
-    const drawer = createDrawer(root, {
-      id: "fg-global-drawer",
-      title: "M\xE9tricas globais",
-      tabs: [
-        { id: "overview", label: "Overview" },
-        { id: "charts", label: "Charts" }
-      ],
-      onClose: () => {
-        syncGlobalMetricsButton(instance);
-        syncChromePinned(instance);
-      },
-      onOpen: () => {
-        syncGlobalMetricsButton(instance);
-        syncChromePinned(instance);
-      }
-    });
-    instance._globalDrawer = drawer;
-    return drawer;
-  }
-  function updateGlobalPanel(instance) {
-    var _a, _b, _c, _d, _e2, _f, _g;
-    const drawer = instance._globalDrawer;
-    if (!drawer || !instance.metrics) return;
-    const cfg = instance.config;
-    const chartsOn = ((_a = cfg.metrics) == null ? void 0 : _a.charts) !== false;
-    const windowSec = (_c = (_b = cfg.metrics) == null ? void 0 : _b.windowSec) != null ? _c : 30;
-    const primary = (_e2 = (_d = cfg.theme) == null ? void 0 : _d.primary) != null ? _e2 : "#7C3AED";
-    const s = instance.metrics.systemStats();
-    const sys = instance.metrics.system;
-    const overview = drawer.panel("overview");
-    if (overview) {
-      overview.innerHTML = statsGrid([
-        ["RT", s.lastRt != null ? `${s.lastRt} ms` : "\u2014"],
-        ["Throughput", `${s.throughput}/s`],
-        ["p50 RT", fmtMs2(s.p50Rt)],
-        ["p90 RT", fmtMs2(s.p90Rt)],
-        ["Rejects", String(s.rejects)],
-        ["Completed", String(s.completed)]
-      ]);
-    }
-    const charts = drawer.panel("charts");
-    if (charts) {
-      if (!chartsOn) {
-        charts.innerHTML = '<p class="fg-muted fg-panel-placeholder">Charts desativados (metrics.charts: false).</p>';
-        return;
-      }
-      const rtSeries = sys.rtSamples || [];
-      const tpSeries = bucketBySecond(sys.throughput || [], windowSec);
-      charts.innerHTML = `
-      <div class="fg-panel-section">
-        ${renderSparkline(rtSeries, { label: "Response time", unit: "ms", color: primary, width: 268, height: 52 })}
-      </div>
-      <div class="fg-panel-section">
-        ${renderSparkline(tpSeries, { label: "Throughput / s", unit: "/s", color: (_g = (_f = cfg.theme) == null ? void 0 : _f.success) != null ? _g : "#3D6B52", width: 268, height: 52 })}
-      </div>`;
-    }
-  }
-  function mountNodeDrawer(root, instance, config) {
-    var _a, _b;
-    if (((_a = config.metrics) == null ? void 0 : _a.nodeDrawer) === false && ((_b = config.metrics) == null ? void 0 : _b.nodePanel) === false) return null;
-    const drawer = createDrawer(root, {
-      id: "fg-node-drawer",
-      side: "left",
-      title: "N\xF3",
-      tabs: [
-        { id: "info", label: "Info" },
-        { id: "metrics", label: "Metrics" },
-        { id: "config", label: "Config" }
-      ],
-      onClose: () => {
-        if (instance._selectedNode) {
-          instance.nodeRenderer.setSelected(instance._selectedNode, false);
-          instance._selectedNode = null;
-          instance._clearEdgeHighlight();
-        }
-        syncChromePinned(instance);
-      },
-      onOpen: () => {
-        syncChromePinned(instance);
-      }
-    });
-    instance._nodeDrawer = drawer;
-    return drawer;
-  }
-  function updateNodePanel(instance, nodeId) {
-    const drawer = instance._nodeDrawer;
-    if (!drawer || !instance.metrics) return;
-    renderNodePanelContent(instance, nodeId);
-    if (!drawer.isOpen()) drawer.open();
-  }
-  function refreshOpenPanels(instance) {
-    var _a, _b;
-    if ((_a = instance._globalDrawer) == null ? void 0 : _a.isOpen()) updateGlobalPanel(instance);
-    if (((_b = instance._nodeDrawer) == null ? void 0 : _b.isOpen()) && instance._selectedNode) {
-      const onConfig = instance._nodeDrawer.getActiveTab() === "config";
-      renderNodePanelContent(instance, instance._selectedNode, { refreshConfig: !onConfig });
-    }
-  }
-  function closeNodeDrawer(instance) {
-    var _a;
-    (_a = instance._nodeDrawer) == null ? void 0 : _a.close();
-  }
-
   // src/index.js
   var NS5 = "http://www.w3.org/2000/svg";
   var CSS_HREF = "flowgraph.css";
+  var PLAYBACK_MODES = ["play", "narrative", "step"];
   function resolveTarget(target) {
     if (typeof target === "string") return document.querySelector(target);
     return target;
@@ -4409,16 +4309,21 @@ var FlowGraph = (() => {
       this.running = false;
       this._raf = null;
       this._lastTs = 0;
-      this.metrics = new MetricsStore(this.config);
-      this._selectedNode = null;
-      this._metricsTimer = null;
+      this.playbackMode = this.config.scenario.defaultMode || "play";
+      if (!PLAYBACK_MODES.includes(this.playbackMode)) this.playbackMode = "play";
+      this.playSpeed = this.config.scenario.speed || 1;
+      this._stepping = false;
+      this._atNodeId = null;
+      this._stepHighlight = { nodeId: null, edgeId: null, edgeIds: [] };
+      this.nodeStats = new NodeStats(this.config.nodes);
       if (this.config.injectStyles) injectStylesheet();
       this._mount();
-      this._bindSimulation();
+      this._bindPlayer();
+      this._applyPlaybackMode(this.playbackMode, { initial: true });
       if (this.config.autoStart) this.start();
     }
     _mount() {
-      var _a, _b, _c, _d;
+      var _a;
       const cfg = this.config;
       this.container.innerHTML = "";
       this.container.classList.add("fg-container");
@@ -4469,30 +4374,14 @@ var FlowGraph = (() => {
       this.nodeRenderer = renderNodes(nodesLayer, cfg.nodes, cfg.theme);
       this.particles = new ParticleSystem(particlesLayer, this.edgeRenderer, cfg);
       this.viewport = createViewport(svg, viewportG, cfg, this.bounds);
-      mountGlobalDrawer(root, this, cfg);
-      mountNodeDrawer(root, this, cfg);
+      this._narration = mountNarrationOverlay(root, cfg, this);
       createChrome(root, this, cfg);
+      this._scenarioPanel = mountScenarioPanel(root, this, cfg);
+      if (!this._scenarioPanel) {
+        mountStepBar(this._chromeDock || root, this, cfg);
+      }
       this.container.appendChild(root);
       const nodeDrag = ((_a = cfg.interaction) == null ? void 0 : _a.nodeDrag) !== false;
-      const nodeSelect = ((_b = cfg.interaction) == null ? void 0 : _b.nodeSelect) !== false;
-      const nodeDrawerOn = ((_c = cfg.metrics) == null ? void 0 : _c.nodeDrawer) !== false && ((_d = cfg.metrics) == null ? void 0 : _d.nodePanel) !== false;
-      cfg.nodes.forEach((n) => {
-        var _a2;
-        const g = (_a2 = this.nodeRenderer.nodeViews[n.id]) == null ? void 0 : _a2.g;
-        if (!g) return;
-        if (nodeDrag) g.style.cursor = "grab";
-        else if (nodeSelect) g.style.cursor = "pointer";
-        if (!nodeSelect) return;
-        g.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (this._nodeJustDragged) {
-            this._nodeJustDragged = false;
-            return;
-          }
-          this.selectNode(n.id);
-          if (nodeDrawerOn) updateNodePanel(this, n.id);
-        });
-      });
       if (nodeDrag) attachNodeDrag(this);
       this.nodeRenderer.refreshIcons();
       requestAnimationFrame(() => {
@@ -4504,57 +4393,426 @@ var FlowGraph = (() => {
         this._ro.observe(svg);
       }
     }
-    selectNode(nodeId) {
-      if (this._selectedNode && this._selectedNode !== nodeId) {
-        this.nodeRenderer.setSelected(this._selectedNode, false);
-      }
-      this._selectedNode = nodeId;
-      this.nodeRenderer.setSelected(nodeId, true);
-      this._highlightEdges(nodeId);
+    _shouldNarrate() {
+      return this.playbackMode === "narrative" || this.playbackMode === "step";
     }
-    _highlightEdges(nodeId) {
-      const primary = this.config.theme.primary;
-      this.config.edges.forEach((e) => {
-        const hit = e.from === nodeId || e.to === nodeId;
-        this.edgeRenderer.setActive(e.id, hit, hit ? primary : null);
-        this.edgeRenderer.setDimmed(e.id, !hit);
-      });
+    _shouldHighlight() {
+      return this.playbackMode === "narrative";
     }
-    _clearEdgeHighlight() {
-      this.config.edges.forEach((e) => {
-        this.edgeRenderer.setActive(e.id, false);
-        this.edgeRenderer.setDimmed(e.id, false);
-      });
+    _isManual() {
+      return this.playbackMode === "step";
     }
-    updateNode(nodeId, patch) {
-      applyNodePatch(this.config, nodeId, patch);
-      this.sim.patchNode(nodeId, this.config.nodesById[nodeId]);
-      if (this._selectedNode === nodeId) this.refreshOpenPanels();
+    _refreshNodeMetrics(nodeId) {
+      const node = this.config.nodesById[nodeId];
+      if (!(node == null ? void 0 : node.metrics)) return;
+      const auto = this.nodeStats.pillsFor(nodeId, node);
+      if (auto.length) this.nodeRenderer.setPillsBottom(nodeId, auto);
     }
-    toggleGlobalDrawer() {
-      var _a, _b;
-      if ((_a = this._globalDrawer) == null ? void 0 : _a.isOpen()) {
-        this._globalDrawer.close();
+    _syncScenarioPanel() {
+      var _a, _b, _c, _d, _e2, _f, _g, _h;
+      const narr = (_b = (_a = this.config.scenario) == null ? void 0 : _a.narration) == null ? void 0 : _b.showOnCanvas;
+      const stepMode = this.playbackMode === "step";
+      const narrativeMode = this.playbackMode === "narrative";
+      (_c = this._scenarioPanel) == null ? void 0 : _c.show(!!(narr && stepMode), { stepMode });
+      if (narrativeMode && narr) {
+        (_d = this._narration) == null ? void 0 : _d.setTrackPickerVisible(true);
+        (_e2 = this._narration) == null ? void 0 : _e2.syncTracks();
       } else {
-        (_b = this._globalDrawer) == null ? void 0 : _b.open();
-        updateGlobalPanel(this);
+        (_f = this._narration) == null ? void 0 : _f.setTrackPickerVisible(false);
       }
-      syncGlobalMetricsButton(this);
+      if (stepMode && narr) {
+        (_g = this._scenarioPanel) == null ? void 0 : _g.setTrackSteps(this.player.activePlayer().steps);
+        updateScenarioPanel(this);
+      }
+      (_h = this._stepBar) == null ? void 0 : _h.hide();
+    }
+    _bindPlayer() {
+      const cfg = this.config;
+      const hooks = {
+        shouldNarrate: () => this._shouldNarrate(),
+        shouldSkipNarratePause: () => this.playbackMode === "play",
+        shouldSequentialParallel: () => this.playbackMode !== "play",
+        onReset: () => {
+          var _a, _b;
+          this.particles.clear();
+          this.particles.setSpeedMultiplier(this.playSpeed);
+          this._applyStepHighlight(null);
+          this.nodeStats.reset();
+          cfg.nodes.forEach((n) => {
+            this.nodeRenderer.setEffect(n.id, null);
+            this.nodeRenderer.setActive(n.id, false);
+            if (n.metrics) this._refreshNodeMetrics(n.id);
+          });
+          this._atNodeId = null;
+          (_a = this._narration) == null ? void 0 : _a.set("", "");
+          (_b = this._scenarioPanel) == null ? void 0 : _b.reset();
+          this._syncScenarioPanel();
+        },
+        onStepStart: (step, _manual, _trackId, meta) => {
+          if (this.playbackMode !== "step" || !this._scenarioPanel) return;
+          const idx = this._scenarioPanel.resolveIndex(step, meta);
+          if (idx >= 0) this._scenarioPanel.setActiveIndex(idx);
+        },
+        onNarration: () => {
+          updateScenarioPanel(this);
+          updateStepBar(this);
+        },
+        onStep: () => {
+          updateScenarioPanel(this);
+          updateStepBar(this);
+        },
+        travel: (step, manual, trackId) => this._runTravel(step, manual, trackId),
+        dwell: (step, manual) => this._runDwell(step, manual),
+        setPill: (step) => {
+          const node = cfg.nodesById[step.node];
+          if (!node) return;
+          if (step.pill != null) {
+            node.pillTop = [{ text: String(step.pill), tone: step.tone || "primary" }];
+          }
+          this.nodeRenderer.setPillsTop(step.node, node.pillTop);
+        },
+        setEffect: (step) => {
+          const effect = step.effect || null;
+          this.nodeRenderer.setEffect(step.node, effect);
+          this.nodeRenderer.setActive(step.node, !!effect);
+          if (effect === "open") {
+            const node = cfg.nodesById[step.node];
+            if (node) {
+              node.pillTop = [{ text: "open", tone: "danger" }];
+              this.nodeRenderer.setPillsTop(step.node, node.pillTop);
+            }
+          }
+        },
+        focus: (step) => {
+          var _a, _b, _c, _d;
+          if (!this._shouldHighlight()) return;
+          if (step.edge) {
+            const e = cfg.edgesById[step.edge];
+            (_b = (_a = this.viewport).focusOnNodes) == null ? void 0 : _b.call(_a, e == null ? void 0 : e.from, e == null ? void 0 : e.to, cfg.nodesById);
+          } else if (step.node) {
+            (_d = (_c = this.viewport).focusOnNodes) == null ? void 0 : _d.call(_c, step.node, step.node, cfg.nodesById);
+          }
+        }
+      };
+      this.player = new MultiTrackPlayer(cfg, hooks);
+      this.player.setSpeed(this.playSpeed);
+      this._syncScenarioPanel();
+    }
+    _scaled(ms) {
+      return Math.max(0, ms / (this.playSpeed || 1));
+    }
+    _stepBeat(ms) {
+      return new Promise((r) => setTimeout(r, this._scaled(ms)));
+    }
+    _applyStepHighlight(highlight) {
+      var _a, _b, _c;
+      if (!this._shouldHighlight()) {
+        (_a = this.root) == null ? void 0 : _a.classList.remove("fg-step-focus", "fg-narrative-focus");
+        const prev2 = this._stepHighlight;
+        if (prev2.nodeId) this.nodeRenderer.setStepActive(prev2.nodeId, false);
+        if (prev2.edgeId) this.edgeRenderer.setStepActive(prev2.edgeId, false);
+        this._stepHighlight = { nodeId: null, edgeId: null, edgeIds: [] };
+        return;
+      }
+      const prev = this._stepHighlight;
+      if (prev.nodeId) this.nodeRenderer.setStepActive(prev.nodeId, false);
+      if (prev.edgeId) this.edgeRenderer.setStepActive(prev.edgeId, false);
+      this._stepHighlight = { nodeId: null, edgeId: null, edgeIds: [] };
+      (_b = this.root) == null ? void 0 : _b.classList.remove("fg-step-focus", "fg-narrative-focus");
+      if (!highlight) return;
+      const focusClass = this.playbackMode === "step" ? "fg-step-focus" : "fg-narrative-focus";
+      (_c = this.root) == null ? void 0 : _c.classList.add(focusClass);
+      const phase = highlight.phase || "default";
+      if (phase === "depart" || phase === "origin") {
+        const fromId = highlight.fromNodeId || highlight.nodeId;
+        if (fromId) {
+          this.nodeRenderer.setStepActive(fromId, true);
+          this._stepHighlight.nodeId = fromId;
+        }
+        if (highlight.edgeId) {
+          this.edgeRenderer.setStepActive(highlight.edgeId, true);
+          this._stepHighlight.edgeId = highlight.edgeId;
+        }
+        return;
+      }
+      if (phase === "moving" && highlight.edgeId) {
+        this.edgeRenderer.setStepActive(highlight.edgeId, true);
+        this._stepHighlight.edgeId = highlight.edgeId;
+        return;
+      }
+      if (phase === "arrive") {
+        const toId = highlight.toNodeId || highlight.nodeId;
+        if (toId) {
+          this.nodeRenderer.setStepActive(toId, true);
+          this._stepHighlight.nodeId = toId;
+        }
+        return;
+      }
+      if (highlight.nodeId) {
+        this.nodeRenderer.setStepActive(highlight.nodeId, true);
+        this._stepHighlight.nodeId = highlight.nodeId;
+      }
+      if (highlight.edgeId) {
+        this.edgeRenderer.setStepActive(highlight.edgeId, true);
+        this._stepHighlight.edgeId = highlight.edgeId;
+      }
+    }
+    async _runTravel(step, manual) {
+      var _a, _b, _c, _d;
+      const cfg = this.config;
+      const edge = cfg.edgesById[step.edge];
+      if (!edge) return;
+      const reverse = step.direction === "reverse";
+      const fromId = reverse ? edge.to : edge.from;
+      const toId = reverse ? edge.from : edge.to;
+      const tokenCfg = resolveTokenType(cfg, step.token || "default", edge);
+      step.title = step.title || travelTitle(cfg, step.edge);
+      step.description = step.description || travelDescription(cfg, step.edge, step.direction || "forward");
+      if (this._shouldNarrate()) {
+        if (this.playbackMode === "narrative" || !((_a = this._scenarioPanel) == null ? void 0 : _a.el) || this._scenarioPanel.el.hidden) {
+          (_b = this._narration) == null ? void 0 : _b.set(step.title, step.description);
+        }
+      }
+      const skipMetrics = step.countMetrics === false || tokenCfg.countMetrics === false;
+      const fromNode = cfg.nodesById[fromId];
+      if ((fromNode == null ? void 0 : fromNode.metrics) && !skipMetrics) {
+        this.nodeStats.onDepart(fromId);
+        this._refreshNodeMetrics(fromId);
+      }
+      this._atNodeId = fromId;
+      this.player.activePlayer().atNodeId = fromId;
+      if (this._shouldHighlight()) {
+        this._applyStepHighlight({ phase: "depart", fromNodeId: fromId, edgeId: step.edge });
+        (_d = (_c = this.viewport).focusOnNodes) == null ? void 0 : _d.call(_c, fromId, toId, cfg.nodesById);
+        if (!manual) await this._stepBeat(120);
+      }
+      if (this._shouldHighlight()) {
+        this._applyStepHighlight({ phase: "moving", edgeId: step.edge });
+      }
+      await this.particles.travel(step.edge, tokenCfg, reverse);
+      const toNode = cfg.nodesById[toId];
+      if ((toNode == null ? void 0 : toNode.metrics) && !skipMetrics) {
+        this.nodeStats.onArrive(toId);
+        this._refreshNodeMetrics(toId);
+      }
+      this._atNodeId = toId;
+      this.player.activePlayer().atNodeId = toId;
+      if (this._shouldHighlight()) {
+        this._applyStepHighlight({ phase: "arrive", toNodeId: toId });
+        if (!manual) await this._stepBeat(150);
+      } else {
+        this._applyStepHighlight(null);
+      }
+    }
+    async _runDwell(step, manual) {
+      var _a, _b;
+      const cfg = this.config;
+      step.title = step.title || dwellTitle(cfg, step.node);
+      step.description = step.description || dwellDescription(cfg, step.node, step.effect);
+      if (this._shouldNarrate()) {
+        if (this.playbackMode === "narrative" || !((_a = this._scenarioPanel) == null ? void 0 : _a.el) || this._scenarioPanel.el.hidden) {
+          (_b = this._narration) == null ? void 0 : _b.set(step.title, step.description);
+        }
+      }
+      this._atNodeId = step.node;
+      this.player.activePlayer().atNodeId = step.node;
+      if (this._shouldHighlight()) {
+        this._applyStepHighlight({ nodeId: step.node, phase: "default" });
+      }
+      const node = cfg.nodesById[step.node];
+      const effect = step.effect || "processing";
+      const savedPillTop = (node == null ? void 0 : node.pillTop) ? [...node.pillTop] : [];
+      this.nodeRenderer.setEffect(step.node, effect);
+      this.nodeRenderer.setActive(step.node, true);
+      if (effect === "processing") {
+        this.nodeRenderer.setPillsTop(step.node, [
+          { text: "running", tone: "warning", animated: true, icon: "\xB7\xB7\xB7" }
+        ]);
+      }
+      const base = manual ? 280 : step.ms || 500;
+      const ms = this.playbackMode === "play" ? base * 0.55 : base;
+      await this._stepBeat(ms);
+      this.nodeRenderer.setEffect(step.node, null);
+      this.nodeRenderer.setActive(step.node, false);
+      if (effect === "processing" && node) {
+        this.nodeRenderer.setPillsTop(step.node, savedPillTop);
+      }
+      if (!this._shouldHighlight()) this._applyStepHighlight(null);
+    }
+    setPlaybackMode(mode) {
+      if (!PLAYBACK_MODES.includes(mode) || mode === this.playbackMode) return;
+      const keepRunning = this.running;
+      this._resetPlaybackState();
+      this._applyPlaybackMode(mode);
+      if (keepRunning) {
+        this.running = true;
+        if (!this._raf) {
+          this._lastTs = 0;
+          this._raf = requestAnimationFrame((t) => this._tick(t));
+        }
+        if (mode !== "step") this._startAutoPlayback();
+      }
+      updatePlayButton(this);
+    }
+    _resetPlaybackState() {
+      var _a, _b;
+      this.player.stopAll();
+      this.player.reset();
+      this._applyStepHighlight(null);
+      this._atNodeId = null;
+      (_a = this._narration) == null ? void 0 : _a.set("", "");
+      (_b = this._scenarioPanel) == null ? void 0 : _b.reset();
+      requestAnimationFrame(() => this.viewport.fit());
+    }
+    setPlaySpeed(speed) {
+      this.playSpeed = speed;
+      this.player.setSpeed(speed);
+      this.particles.setSpeedMultiplier(speed);
+      if (this._speedSelect) this._speedSelect.value = String(speed);
+      updateScenarioPanel(this);
+    }
+    setActiveTrack(trackId) {
+      var _a;
+      this.player.activeTrackId = trackId;
+      updateStepBar(this);
+      this._syncScenarioPanel();
+      const peek = this.player.activePlayer().peek();
+      if (peek && this._shouldNarrate()) {
+        (_a = this._narration) == null ? void 0 : _a.set(peek.title || "", peek.description || "");
+      }
+      if (this.running && this.playbackMode === "narrative") {
+        this._startNarrativeTrack();
+      }
+    }
+    _applyPlaybackMode(mode, { initial = false } = {}) {
+      var _a, _b, _c, _d, _e2, _f;
+      this.playbackMode = mode;
+      PLAYBACK_MODES.forEach((m) => {
+        var _a2;
+        return (_a2 = this.root) == null ? void 0 : _a2.classList.remove(`fg-mode-${m}`);
+      });
+      (_a = this.root) == null ? void 0 : _a.classList.add(`fg-mode-${mode}`);
+      if (mode === "play") {
+        (_b = this._stepBar) == null ? void 0 : _b.hide();
+        (_c = this._narration) == null ? void 0 : _c.set("", "");
+        this._applyStepHighlight(null);
+      } else if (mode === "narrative") {
+        (_d = this._stepBar) == null ? void 0 : _d.hide();
+        const peek = this.player.activePlayer().peek();
+        if (peek) (_e2 = this._narration) == null ? void 0 : _e2.set(peek.title || "", peek.description || "");
+      } else if (mode === "step") {
+        const peek = this.player.activePlayer().peek();
+        if (peek && !this._scenarioPanel) (_f = this._narration) == null ? void 0 : _f.set(peek.title || "", peek.description || "");
+      }
       syncChromePinned(this);
+      updateModeButtons(this);
+      updateStepBar(this);
+      updatePlayButton(this);
+      this._syncScenarioPanel();
+      if (!initial && mode !== "step" && this.running) {
+        this._startAutoPlayback();
+      }
     }
-    refreshGlobalPanel() {
-      updateGlobalPanel(this);
+    _startAutoPlayback() {
+      this.player.stopAll();
+      if (this.playbackMode === "play") {
+        this.player.startParallel();
+      } else if (this.playbackMode === "narrative") {
+        this._startNarrativeTrack();
+      }
     }
-    refreshOpenPanels() {
-      refreshOpenPanels(this);
+    _startNarrativeTrack() {
+      const p2 = this.player.activePlayer();
+      if (!p2) return;
+      this.player.stopAll();
+      p2.reset();
+      p2._forceNoLoop = true;
+      p2.speed = this.player.speed;
+      p2.startPlay(p2.track.offset || 0);
     }
-    _recomputeBounds() {
-      this.viewport.updateBounds(graphBoundsWithEdges(
-        this.config.nodes,
-        this.config.edges,
-        this.config.nodesById,
-        this.config.viewport.padding
-      ));
+    async stepNext() {
+      if (this.playbackMode !== "step" || this._stepping) return null;
+      this._stepping = true;
+      updateStepBar(this);
+      updateScenarioPanel(this);
+      try {
+        return await this.player.stepNext();
+      } finally {
+        this._stepping = false;
+        updateStepBar(this);
+        updateScenarioPanel(this);
+      }
+    }
+    async stepPrev() {
+      if (this.playbackMode !== "step" || this._stepping) return null;
+      this._stepping = true;
+      updateStepBar(this);
+      updateScenarioPanel(this);
+      try {
+        return await this.player.stepPrev();
+      } finally {
+        this._stepping = false;
+        updateStepBar(this);
+        updateScenarioPanel(this);
+      }
+    }
+    /** @deprecated use setPlaybackMode('step') */
+    enableStepMode() {
+      this.setPlaybackMode("step");
+    }
+    /** @deprecated use setPlaybackMode('play') */
+    disableStepMode() {
+      this.setPlaybackMode("play");
+    }
+    _tick(ts) {
+      if (!this._lastTs) this._lastTs = ts;
+      const dt2 = ts - this._lastTs;
+      this._lastTs = ts;
+      this.particles.update(dt2);
+      this._raf = requestAnimationFrame((t) => this._tick(t));
+    }
+    start() {
+      if (this.running) return;
+      this.running = true;
+      this._lastTs = 0;
+      this.particles.setSpeedMultiplier(this.playSpeed);
+      this._raf = requestAnimationFrame((t) => this._tick(t));
+      if (this.playbackMode !== "step") this._startAutoPlayback();
+      updatePlayButton(this);
+    }
+    pause() {
+      this.running = false;
+      this.player.stopAll();
+      if (this._raf) cancelAnimationFrame(this._raf);
+      this._raf = null;
+      updatePlayButton(this);
+    }
+    reset() {
+      const mode = this.playbackMode;
+      this.pause();
+      this.player.reset();
+      this._applyStepHighlight(null);
+      this._atNodeId = null;
+      this.running = true;
+      this._lastTs = 0;
+      this._raf = requestAnimationFrame((t) => this._tick(t));
+      if (mode !== "step") this._startAutoPlayback();
+      updatePlayButton(this);
+      updateModeButtons(this);
+      updateStepBar(this);
+    }
+    destroy() {
+      this.pause();
+      closeFullscreen(this);
+      if (this._ro) this._ro.disconnect();
+      this.container.innerHTML = "";
+      this.container.classList.remove("fg-container");
+    }
+    fit() {
+      this.viewport.fit();
+    }
+    getConfig() {
+      return this.config;
     }
     async applyAutoLayout(engine) {
       const layoutCfg = this.config.layout || {};
@@ -4569,183 +4827,13 @@ var FlowGraph = (() => {
         this.nodeRenderer.setPosition(n.id, n.x, n.y);
       });
       this.edgeRenderer.updatePaths(this.config.nodesById);
-      this._recomputeBounds();
+      this.viewport.updateBounds(graphBoundsWithEdges(
+        this.config.nodes,
+        this.config.edges,
+        this.config.nodesById,
+        this.config.viewport.padding
+      ));
       requestAnimationFrame(() => this.viewport.fit());
-      this._emit("layout:change", { engine: eng });
-    }
-    _bindSimulation() {
-      const onSpawnTrack = (token, edgeId2) => {
-        if (token == null ? void 0 : token.id) this.sim.noteTokenSpawn(token.id, edgeId2);
-      };
-      this.sim = new SimulationEngine(this.config, {
-        onEvent: (event, payload) => {
-          var _a;
-          this._emit(event, payload);
-          if (event === "token:spawn" && payload.sourceId) {
-            const src = this.config.sources.find((s) => s.id === payload.sourceId);
-            if (src) {
-              const edge = this.config.edgesById[src.edgeId];
-              if (edge == null ? void 0 : edge.from) {
-                this.metrics.recordEmit(edge.from, ((_a = src.burst) == null ? void 0 : _a.count) || 1);
-                if (this._selectedNode === edge.from) {
-                  this.refreshOpenPanels();
-                }
-              }
-            }
-          }
-          if (event === "flow:complete") this.refreshOpenPanels();
-        },
-        spawnOnEdge: (edgeId2, tokenCfg, burst, onArrive) => {
-          spawnBurst(
-            this.particles,
-            edgeId2,
-            burst,
-            tokenCfg,
-            (token) => {
-              if (onArrive) onArrive(token);
-            },
-            (token) => onSpawnTrack(token, edgeId2)
-          );
-        },
-        getNodeMetrics: (nodeId) => {
-          const s = this.metrics.nodeStats(nodeId);
-          return s ? { rejects: s.rejects, queueDepth: s.queueDepth } : {};
-        },
-        onPills: (nodeId, pills) => {
-          this.nodeRenderer.setPillsBottom(nodeId, pills);
-        },
-        onMetrics: (kind, data) => {
-          if (kind === "arrive") this.metrics.recordArrive(data.nodeId);
-          if (kind === "processStart") this.metrics.recordProcessStart(data.nodeId, data.waitMs);
-          if (kind === "processEnd") this.metrics.recordProcessEnd(data.nodeId, data.processMs);
-          if (kind === "emit") this.metrics.recordEmit(data.nodeId);
-          if (kind === "reject") this.metrics.recordReject(data.nodeId);
-          if (kind === "sink") this.metrics.recordSink(data.nodeId);
-          if (kind === "flowComplete") this.metrics.recordFlowComplete(data.rtMs);
-          if (kind === "queue") this.metrics.setQueueDepth(data.nodeId, data.depth);
-          if (data == null ? void 0 : data.nodeId) this.sim._refreshPills(data.nodeId);
-          this.refreshOpenPanels();
-        },
-        onNodeProcessStart: (nodeId, effect) => {
-          this.nodeRenderer.setEffect(nodeId, effect);
-          this.nodeRenderer.setActive(nodeId, true);
-          this.metrics.setState(nodeId, "processing");
-        },
-        onNodeProcessEnd: (nodeId) => {
-          this.nodeRenderer.setEffect(nodeId, null);
-          this.nodeRenderer.setActive(nodeId, false);
-          this.metrics.setState(nodeId, "idle");
-        },
-        onNodeWaiting: (nodeId) => {
-          this.nodeRenderer.setEffect(nodeId, "waiting");
-          this.metrics.setState(nodeId, "waiting");
-        },
-        onReset: () => {
-          this.particles.clear();
-          this.metrics = new MetricsStore(this.config);
-          this.config.nodes.forEach((n) => {
-            this.nodeRenderer.setEffect(n.id, null);
-            this.nodeRenderer.setActive(n.id, false);
-            this.sim._refreshPills(n.id);
-          });
-          this.refreshGlobalPanel();
-          closeNodeDrawer(this);
-        }
-      });
-    }
-    _emit(event, payload) {
-      (this.listeners[event] || []).forEach((fn2) => fn2(payload));
-    }
-    on(event, fn2) {
-      if (!this.listeners[event]) this.listeners[event] = [];
-      this.listeners[event].push(fn2);
-      return this;
-    }
-    _tick(ts) {
-      if (!this._lastTs) this._lastTs = ts;
-      const dt2 = ts - this._lastTs;
-      this._lastTs = ts;
-      this.particles.update(dt2);
-      this._raf = requestAnimationFrame((t) => this._tick(t));
-    }
-    start() {
-      if (this.running) return;
-      this.running = true;
-      this._lastTs = 0;
-      this.sim.start();
-      this._raf = requestAnimationFrame((t) => this._tick(t));
-      this._metricsTimer = setInterval(() => this.refreshOpenPanels(), 500);
-      updatePlayButton(this);
-    }
-    pause() {
-      this.running = false;
-      this.sim.pause();
-      if (this._raf) cancelAnimationFrame(this._raf);
-      this._raf = null;
-      if (this._metricsTimer) clearInterval(this._metricsTimer);
-      updatePlayButton(this);
-    }
-    reset() {
-      this.pause();
-      this.sim.reset();
-      updatePlayButton(this);
-    }
-    destroy() {
-      this.pause();
-      if (this._ro) this._ro.disconnect();
-      this.container.innerHTML = "";
-      this.container.classList.remove("fg-container");
-    }
-    fit() {
-      this.viewport.fit();
-    }
-    getConfig() {
-      return this.config;
-    }
-    toJSON() {
-      return {
-        title: this.config.title,
-        viewport: { ...this.config.viewport, background: this.config.viewport.background },
-        layout: this.config.layout,
-        interaction: this.config.interaction,
-        controls: this.config.controls,
-        metrics: this.config.metrics,
-        nodes: this.config.nodes.map((n) => ({
-          id: n.id,
-          type: n.type,
-          role: n.role,
-          label: n.label,
-          icon: n.icon,
-          tone: n.tone,
-          shape: n.shape,
-          x: n.x,
-          y: n.y,
-          duration: n.duration,
-          admission: n.admission,
-          gate: n.gate,
-          emit: n.emit,
-          retry: n.retry,
-          circuit: n.circuit,
-          pillTop: n.pillTop,
-          showReceived: n.showReceived
-        })),
-        edges: this.config.edges.map(({ id, from, to, stroke, label, weight, speed, routing, loopSide, token }) => ({
-          id,
-          from,
-          to,
-          stroke,
-          label,
-          weight,
-          speed,
-          routing,
-          loopSide,
-          token
-        })),
-        sources: this.config.sources
-      };
-    }
-    emit(edgeId2, tokenCfg) {
-      this.sim.emit(edgeId2, tokenCfg);
     }
   };
   function create(target, config) {

@@ -1,20 +1,206 @@
 {
   "title": "POST /predict",
-  "viewport": { "height": 300, "padding": 50 },
-  "tokens": { "color": "#7C3AED", "speed": 95, "size": 7 },
-  "randomness": { "enabled": true },
+  "viewport": {
+    "height": 300,
+    "padding": 50
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "speed": 95,
+    "size": 7
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "speed": 95,
+      "size": 7
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "cliente", "type": "port", "role": "source", "label": "Cliente", "icon": "user", "x": 70, "y": 150 },
-    { "id": "gateway", "type": "process", "label": "API Gateway", "icon": "server", "duration": 350, "x": 210, "y": 150 },
-    { "id": "features", "type": "process", "label": "Feature Store", "icon": "database", "duration": 1400, "x": 370, "y": 150 },
-    { "id": "server", "type": "process", "label": "Model Server", "icon": "cpu", "tone": "warning", "duration": 1800, "x": 530, "y": 150 },
-    { "id": "resp", "type": "port", "role": "terminal", "label": "Resposta", "icon": "circle-check", "tone": "success", "x": 690, "y": 150 }
+    {
+      "id": "cliente",
+      "type": "port",
+      "role": "source",
+      "label": "Cliente",
+      "icon": "user",
+      "x": 70,
+      "y": 150
+    },
+    {
+      "id": "gateway",
+      "type": "process",
+      "label": "API Gateway",
+      "icon": "server",
+      "x": 210,
+      "y": 150
+    },
+    {
+      "id": "features",
+      "type": "process",
+      "label": "Feature Store",
+      "icon": "database",
+      "x": 370,
+      "y": 150
+    },
+    {
+      "id": "server",
+      "type": "process",
+      "label": "Model Server",
+      "icon": "cpu",
+      "tone": "warning",
+      "x": 530,
+      "y": 150
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "cliente", "to": "gateway" },
-    { "id": "e2", "from": "gateway", "to": "features" },
-    { "id": "e3", "from": "features", "to": "server" },
-    { "id": "e4", "from": "server", "to": "resp", "stroke": { "color": "success" } }
+    {
+      "id": "e1",
+      "from": "cliente",
+      "to": "gateway"
+    },
+    {
+      "id": "e2",
+      "from": "gateway",
+      "to": "features"
+    },
+    {
+      "id": "e3",
+      "from": "features",
+      "to": "server"
+    },
+    {
+      "id": "e4",
+      "from": "server",
+      "to": "gateway",
+      "routing": "loopback",
+      "loopSide": "above",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "score"
+      }
+    },
+    {
+      "id": "e5",
+      "from": "gateway",
+      "to": "cliente",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "200 OK"
+      }
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 5000, "jitter": 500 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Serving síncrono",
+          "description": "Uma requisição POST /predict percorre o caminho completo até a resposta — latência de ponta a ponta.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "POST /predict",
+          "description": "Cliente envia features do usuário para inferência em tempo real."
+        }
+      },
+      {
+        "dwell": {
+          "node": "gateway",
+          "effect": "processing",
+          "ms": 350,
+          "title": "API Gateway",
+          "description": "Rate limit, autenticação JWT e roteamento para o serviço de ML."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "Lookup de features",
+          "description": "Gateway consulta o Feature Store online por vetor de entrada."
+        }
+      },
+      {
+        "dwell": {
+          "node": "features",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "Feature Store",
+          "description": "Busca features pré-computadas (idade, histórico, embeddings) com cache Redis."
+        }
+      },
+      {
+        "setPill": {
+          "node": "features",
+          "pill": "cache hit",
+          "tone": "success",
+          "title": "Cache hit",
+          "description": "Features encontradas no cache — sem round-trip ao data lake."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "default",
+          "title": "Tensor de entrada",
+          "description": "Vetor normalizado enviado ao Model Server para forward pass."
+        }
+      },
+      {
+        "dwell": {
+          "node": "server",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "Model Server",
+          "description": "Inferência ONNX no GPU — softmax gera score de churn (p=0.87)."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Resposta síncrona",
+          "description": "O cliente recebe a predição na mesma conexão HTTP — sem polling nem fila.",
+          "ms": 600
+        }
+      },
+      {
+        "travel": {
+          "edge": "e4",
+          "token": "default",
+          "title": "Score → Gateway",
+          "description": "Model Server devolve predição ao API Gateway."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e5",
+          "token": "default",
+          "title": "200 OK + score",
+          "description": "JSON com probabilidade, threshold e versão do modelo (v2.4.1) — mesma conexão HTTP."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1100
+        }
+      }
+    ]
+  }
 }

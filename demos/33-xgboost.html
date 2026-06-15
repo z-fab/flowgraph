@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XGBoost train — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">33 — XGBoost</span></nav>
+  <div class="demo-wrap">
+    <h1>XGBoost train</h1>
+    <p class="lead">Rounds sequenciais com loopback tree→round; após round 6 vai para eval. loss decresce a cada round.</p>
+    <div class="demo-tags"><span class="demo-tag">ML clássico</span><span class="demo-tag ml">v2 simulated</span></div>
+    <div id="demo"></div>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/33-xgboost.json');
+  </script>
+</body>
+</html>

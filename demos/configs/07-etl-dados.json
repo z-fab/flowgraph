@@ -1,16 +1,169 @@
 {
   "title": "ETL pipeline",
-  "viewport": { "height": 300, "padding": 50 },
+  "viewport": {
+    "height": 300,
+    "padding": 50
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "src", "type": "port", "role": "source", "label": "Ingest", "shape": "circle", "icon": "download", "x": 80, "y": 150 },
-    { "id": "transform", "type": "process", "label": "Transform", "icon": "shuffle", "duration": 1000, "x": 240, "y": 150 },
-    { "id": "validate", "type": "process", "label": "Validate", "icon": "shield-check", "duration": 600, "x": 400, "y": 150, "tone": "warning" },
-    { "id": "dw", "type": "port", "role": "sink", "label": "Warehouse", "icon": "database", "tone": "success", "x": 560, "y": 150, "showReceived": true }
+    {
+      "id": "src",
+      "type": "port",
+      "role": "source",
+      "label": "Ingest",
+      "shape": "circle",
+      "icon": "download",
+      "x": 80,
+      "y": 150
+    },
+    {
+      "id": "transform",
+      "type": "process",
+      "label": "Transform",
+      "icon": "shuffle",
+      "x": 240,
+      "y": 150
+    },
+    {
+      "id": "validate",
+      "type": "process",
+      "label": "Validate",
+      "icon": "shield-check",
+      "x": 400,
+      "y": 150,
+      "tone": "warning"
+    },
+    {
+      "id": "dw",
+      "type": "port",
+      "role": "sink",
+      "label": "Warehouse",
+      "icon": "database",
+      "tone": "success",
+      "x": 560,
+      "y": 150
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "src", "to": "transform", "label": { "text": "raw" } },
-    { "id": "e2", "from": "transform", "to": "validate", "label": { "text": "clean" } },
-    { "id": "e3", "from": "validate", "to": "dw", "stroke": { "color": "success" } }
+    {
+      "id": "e1",
+      "from": "src",
+      "to": "transform",
+      "label": {
+        "text": "raw"
+      }
+    },
+    {
+      "id": "e2",
+      "from": "transform",
+      "to": "validate",
+      "label": {
+        "text": "clean"
+      }
+    },
+    {
+      "id": "e3",
+      "from": "validate",
+      "to": "dw",
+      "stroke": {
+        "color": "success"
+      }
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 3500, "burst": { "count": 2, "spacing": 80 } }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Pipeline ETL",
+          "description": "Dados brutos de APIs e logs passam por transformação, validação de qualidade e carga no warehouse.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Ingestão raw",
+          "description": "Arquivos Parquet e eventos JSON chegam do data lake (camada bronze)."
+        }
+      },
+      {
+        "dwell": {
+          "node": "transform",
+          "effect": "processing",
+          "ms": 1000,
+          "title": "Transform",
+          "description": "Normalização de schema, deduplicação por chave e enriquecimento com dimensões."
+        }
+      },
+      {
+        "setPill": {
+          "node": "transform",
+          "pill": "2.4M rows",
+          "tone": "primary",
+          "title": "Volume processado",
+          "description": "Lote diário transformado com sucesso."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "Dados limpos",
+          "description": "Dataset tipado e sem nulos críticos segue para validação."
+        }
+      },
+      {
+        "dwell": {
+          "node": "validate",
+          "effect": "processing",
+          "ms": 600,
+          "title": "Validate",
+          "description": "Great Expectations verifica ranges, unicidade e freshness (< 24h)."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "validate",
+          "effect": "open",
+          "title": "Checks OK",
+          "description": "Todas as 12 regras de qualidade passaram."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Carga no warehouse",
+          "description": "Dados validados são materializados na camada gold para analytics e feature engineering.",
+          "ms": 600
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "default",
+          "title": "Load → Warehouse",
+          "description": "INSERT incremental na tabela fato_transacoes (partição dt=2026-06-15)."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1100
+        }
+      }
+    ]
+  }
 }

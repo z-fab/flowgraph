@@ -1,19 +1,242 @@
 {
   "title": "batch_size=8",
-  "viewport": { "height": 300, "padding": 55 },
-  "tokens": { "color": "#7C3AED", "size": 6, "speed": 110 },
+  "viewport": {
+    "height": 300,
+    "padding": 55
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "size": 6,
+    "speed": 110
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "size": 6,
+      "speed": 110
+    },
+    "batch": {
+      "color": "#3D6B52",
+      "shape": "rect",
+      "size": 7,
+      "speed": 90
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "req", "type": "port", "role": "source", "shape": "circle", "icon": "inbox", "x": 90, "y": 150 },
-    { "id": "batch", "type": "process", "label": "Batcher", "icon": "layers",
-      "admission": { "mode": "batch", "max": 8, "step": 1 }, "duration": 200,
-      "pillTop": [{ "text": "μ-batch", "tone": "primary" }], "x": 280, "y": 150 },
-    { "id": "gpu", "type": "process", "label": "GPU infer", "icon": "cpu", "tone": "warning", "duration": 1800, "x": 470, "y": 150 },
-    { "id": "out", "type": "port", "role": "terminal", "label": "Responses", "icon": "send", "tone": "success", "x": 650, "y": 150 }
+    {
+      "id": "req",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "inbox",
+      "x": 90,
+      "y": 150
+    },
+    {
+      "id": "batch",
+      "type": "process",
+      "label": "Batcher",
+      "icon": "layers",
+      "pillTop": [
+        {
+          "text": "μ-batch",
+          "tone": "primary"
+        }
+      ],
+      "x": 280,
+      "y": 150
+    },
+    {
+      "id": "gpu",
+      "type": "process",
+      "label": "GPU infer",
+      "icon": "cpu",
+      "tone": "warning",
+      "x": 470,
+      "y": 150
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "req", "to": "batch", "label": { "text": "req" } },
-    { "id": "e2", "from": "batch", "to": "gpu", "label": { "text": "batch" } },
-    { "id": "e3", "from": "gpu", "to": "out", "stroke": { "color": "success" } }
+    {
+      "id": "e1",
+      "from": "req",
+      "to": "batch",
+      "label": {
+        "text": "req"
+      }
+    },
+    {
+      "id": "e2",
+      "from": "batch",
+      "to": "gpu",
+      "label": {
+        "text": "batch"
+      }
+    },
+    {
+      "id": "e3",
+      "from": "gpu",
+      "to": "req",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "8× responses"
+      }
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 450, "jitter": 150 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 500,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Micro-batching na GPU",
+          "description": "Requisições chegam de forma assíncrona; o batcher acumula até batch_size=8 e dispara uma inferência vetorizada.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Req 1/8",
+          "description": "Primeira requisição entra no buffer do batcher."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "batch",
+          "effect": "waiting",
+          "title": "Acumulando",
+          "description": "Batcher aguarda mais requisições antes do flush."
+        }
+      },
+      {
+        "setPill": {
+          "node": "batch",
+          "pill": "1/8",
+          "tone": "primary",
+          "title": "Buffer parcial",
+          "description": "1 de 8 slots preenchidos."
+        }
+      },
+      {
+        "dwell": {
+          "node": "batch",
+          "effect": "waiting",
+          "ms": 200,
+          "title": "Batcher",
+          "description": "Timeout de 50 ms — ainda não atingiu batch_size."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Req 2–7/8",
+          "description": "Mais seis requisições chegam em rajada."
+        }
+      },
+      {
+        "setPill": {
+          "node": "batch",
+          "pill": "7/8",
+          "tone": "warning",
+          "title": "Quase cheio",
+          "description": "Falta uma requisição para atingir batch_size=8."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Req 8/8",
+          "description": "Última requisição completa o micro-batch."
+        }
+      },
+      {
+        "setPill": {
+          "node": "batch",
+          "pill": "8/8 flush",
+          "tone": "success",
+          "title": "Batch completo",
+          "description": "Buffer cheio — dispara inferência na GPU."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "batch",
+          "effect": "processing",
+          "title": "Flush",
+          "description": "Tensor [8, seq_len] montado e enviado à GPU."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "batch",
+          "title": "Batch → GPU",
+          "description": "Inferência vetorizada processa 8 prompts em paralelo."
+        }
+      },
+      {
+        "dwell": {
+          "node": "gpu",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "GPU infer",
+          "description": "Kernel CUDA executa forward pass batched — throughput 6× maior que serial."
+        }
+      },
+      {
+        "setPill": {
+          "node": "gpu",
+          "pill": "8× done",
+          "tone": "success",
+          "title": "Inferência concluída",
+          "description": "8 respostas prontas para despacho."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "batch",
+          "title": "GPU → Clients",
+          "description": "Respostas demultiplexadas e entregues aos clientes via HTTP."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "batch",
+          "effect": "",
+          "title": "Reset",
+          "description": "Batcher limpo — pronto para novo ciclo de acumulação."
+        }
+      },
+      {
+        "setPill": {
+          "node": "batch",
+          "pill": "μ-batch",
+          "tone": "primary",
+          "title": "Batcher ocioso",
+          "description": "Aguardando próximas requisições."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

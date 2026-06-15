@@ -1,20 +1,282 @@
 {
   "title": "CI/CD deploy",
-  "viewport": { "height": 300, "padding": 50 },
+  "viewport": {
+    "height": 300,
+    "padding": 50
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "git", "type": "port", "role": "source", "label": "Git push", "shape": "circle", "icon": "git-branch", "x": 80, "y": 150 },
-    { "id": "ci", "type": "process", "label": "CI tests", "icon": "check-circle", "duration": 900, "x": 230, "y": 150 },
-    { "id": "build", "type": "process", "label": "Build image", "icon": "box", "duration": 700, "x": 380, "y": 150 },
-    { "id": "canary", "type": "process", "label": "Canary", "icon": "percent", "duration": 400, "emit": { "mode": "weighted" }, "x": 530, "y": 150 },
-    { "id": "prod", "type": "port", "role": "sink", "label": "Production", "icon": "rocket", "tone": "success", "x": 680, "y": 100 },
-    { "id": "rollback", "type": "port", "role": "sink", "label": "Rollback", "icon": "undo", "tone": "danger", "x": 680, "y": 200 }
+    {
+      "id": "git",
+      "type": "port",
+      "role": "source",
+      "label": "Git push",
+      "shape": "circle",
+      "icon": "git-branch",
+      "x": 80,
+      "y": 150
+    },
+    {
+      "id": "ci",
+      "type": "process",
+      "label": "CI tests",
+      "icon": "check-circle",
+      "x": 230,
+      "y": 150
+    },
+    {
+      "id": "build",
+      "type": "process",
+      "label": "Build image",
+      "icon": "box",
+      "x": 380,
+      "y": 150
+    },
+    {
+      "id": "canary",
+      "type": "process",
+      "label": "Canary",
+      "icon": "percent",
+      "x": 530,
+      "y": 150
+    },
+    {
+      "id": "prod",
+      "type": "port",
+      "role": "sink",
+      "label": "Production",
+      "icon": "rocket",
+      "tone": "success",
+      "x": 680,
+      "y": 100
+    },
+    {
+      "id": "rollback",
+      "type": "port",
+      "role": "sink",
+      "label": "Rollback",
+      "icon": "undo",
+      "tone": "danger",
+      "x": 680,
+      "y": 200
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "git", "to": "ci" },
-    { "id": "e2", "from": "ci", "to": "build" },
-    { "id": "e3", "from": "build", "to": "canary" },
-    { "id": "ok", "from": "canary", "to": "prod", "weight": 8, "stroke": { "color": "success" }, "label": { "text": "promote" } },
-    { "id": "fail", "from": "canary", "to": "rollback", "weight": 2, "stroke": { "color": "danger", "dash": "dash" }, "label": { "text": "fail" } }
+    {
+      "id": "e1",
+      "from": "git",
+      "to": "ci"
+    },
+    {
+      "id": "e2",
+      "from": "ci",
+      "to": "build"
+    },
+    {
+      "id": "e3",
+      "from": "build",
+      "to": "canary"
+    },
+    {
+      "id": "ok",
+      "from": "canary",
+      "to": "prod",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "promote"
+      }
+    },
+    {
+      "id": "fail",
+      "from": "canary",
+      "to": "rollback",
+      "stroke": {
+        "color": "danger",
+        "dash": "dash"
+      },
+      "label": {
+        "text": "fail"
+      }
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 5000 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 580,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Deploy canário",
+          "description": "Nova versão do modelo passa por CI, build de imagem e rollout gradual com monitoramento de métricas.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "git push main",
+          "description": "Commit feat: modelo v4.0 com AUC +2% dispara o pipeline."
+        }
+      },
+      {
+        "dwell": {
+          "node": "ci",
+          "effect": "processing",
+          "ms": 900,
+          "title": "CI tests",
+          "description": "Unit tests, contract tests da API e validação do schema ONNX."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "ci",
+          "effect": "open",
+          "title": "CI verde",
+          "description": "142 testes passaram — artefato liberado para build."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "Trigger build",
+          "description": "Pipeline avança para containerização da imagem."
+        }
+      },
+      {
+        "dwell": {
+          "node": "build",
+          "effect": "processing",
+          "ms": 700,
+          "title": "Build image",
+          "description": "Docker build multi-stage — imagem model-server:4.0.0 publicada no ECR."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "default",
+          "title": "Deploy canário",
+          "description": "Nova imagem implantada em 5% do tráfego de produção."
+        }
+      },
+      {
+        "dwell": {
+          "node": "canary",
+          "effect": "processing",
+          "ms": 400,
+          "title": "Canary",
+          "description": "Monitorando error rate, latência p99 e drift de features por 10 min."
+        }
+      },
+      {
+        "setPill": {
+          "node": "canary",
+          "pill": "5% traffic",
+          "tone": "primary",
+          "title": "Rollout gradual",
+          "description": "Apenas 5% das requisições roteadas para v4.0."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Promoção ou rollback",
+          "description": "Métricas dentro do SLO → promote para 100%. Violação → rollback automático para v3.9.",
+          "ms": 700
+        }
+      },
+      {
+        "travel": {
+          "edge": "ok",
+          "token": "default",
+          "title": "Promote → Production",
+          "description": "Canary aprovado — rollout completo para todos os pods."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "prod",
+          "effect": "open",
+          "title": "v4.0 em produção",
+          "description": "Modelo v4.0 servindo 100% do tráfego."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Rollback automático",
+          "description": "Na próxima iteração: canary viola SLO → rollback para v3.9.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "git push hotfix",
+          "description": "Novo commit dispara pipeline novamente."
+        }
+      },
+      {
+        "dwell": {
+          "node": "ci",
+          "effect": "processing",
+          "ms": 600,
+          "title": "CI tests"
+        }
+      },
+      {
+        "travel": { "edge": "e2", "token": "default", "title": "Build" }
+      },
+      {
+        "dwell": { "node": "build", "effect": "processing", "ms": 500, "title": "Build image" }
+      },
+      {
+        "travel": { "edge": "e3", "token": "default", "title": "Canary deploy" }
+      },
+      {
+        "dwell": {
+          "node": "canary",
+          "effect": "waiting",
+          "ms": 500,
+          "title": "Canary falhou",
+          "description": "Error rate acima do SLO — rollback automático."
+        }
+      },
+      {
+        "travel": {
+          "edge": "fail",
+          "token": "default",
+          "title": "Rollback → v3.9",
+          "description": "Tráfego revertido para imagem estável anterior."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "rollback",
+          "effect": "open",
+          "title": "Rollback concluído",
+          "description": "v3.9 restaurada em todos os pods."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1000
+        }
+      }
+    ]
+  }
 }

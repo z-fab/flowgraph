@@ -89,5 +89,36 @@ export function createViewport(svg, g, config, boundsRef) {
     updateBounds,
     screenToGraph,
     getTransform: () => ({ scale: state.scale, tx: state.tx, ty: state.ty }),
+    focusOnNodes(fromId, toId, nodesById, padding = 48) {
+      const ids = [fromId, toId].filter(Boolean);
+      const nodes = ids.map((id) => nodesById[id]).filter(Boolean);
+      if (!nodes.length) return;
+
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      nodes.forEach((n) => {
+        minX = Math.min(minX, n.x - 36);
+        maxX = Math.max(maxX, n.x + 36);
+        minY = Math.min(minY, n.y - 36);
+        maxY = Math.max(maxY, n.y + 36);
+      });
+
+      const bx = minX - padding;
+      const by = minY - padding;
+      const bw = maxX - minX + padding * 2;
+      const bh = maxY - minY + padding * 2;
+      const rect = svg.getBoundingClientRect();
+      if (!rect.width || !rect.height || !bw || !bh) return;
+
+      const sx = rect.width / bw;
+      const sy = rect.height / bh;
+      state.scale = Math.min(sx, sy, zoomCfg.max || 2.5);
+      state.scale = Math.max(state.scale, zoomCfg.min || 0.4);
+      state.tx = (rect.width - bw * state.scale) / 2 - bx * state.scale;
+      state.ty = (rect.height - bh * state.scale) / 2 - by * state.scale;
+      applyTransform(state.scale, state.tx, state.ty);
+    },
   };
 }

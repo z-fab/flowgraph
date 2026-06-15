@@ -1,7 +1,15 @@
 const NS = 'http://www.w3.org/2000/svg';
 
-const ANGLE_SPREAD = 0.14;
-const LABEL_T_SPREAD = 0.12;
+import {
+  buildOrthogonalPoints,
+  buildOrthogonalLoopback,
+  polylineToPath,
+  computeOrthogonalLanes,
+} from './edge-orthogonal.js';
+
+const ANGLE_SPREAD = 0.16;
+const LATERAL_SPREAD = 18;
+const LABEL_T_SPREAD = 0.14;
 
 export function nodeBounds(node) {
   const { w, h } = node.size;
@@ -47,14 +55,16 @@ export function isLoopbackEdge(fromNode, toNode, routing) {
 }
 
 export function computeEdgeAnchorOffsets(edges, nodesById) {
+  const orthoLanes = computeOrthogonalLanes(edges, nodesById);
   const fromGroups = {};
   const toGroups = {};
-  const offsets = {};
+  const offsets = { ...orthoLanes };
 
   edges.forEach((edge) => {
     const fromNode = nodesById[edge.from];
     const toNode = nodesById[edge.to];
     if (!fromNode || !toNode) return;
+    if (edge.routing === 'orthogonal') return;
     const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
     const kf = `${edge.from}:out`;
     const kt = `${edge.to}:in`;
@@ -62,18 +72,25 @@ export function computeEdgeAnchorOffsets(edges, nodesById) {
     if (!toGroups[kt]) toGroups[kt] = [];
     fromGroups[kf].push({ edge, angle });
     toGroups[kt].push({ edge, angle });
-    offsets[edge.id] = { fromAngle: 0, toAngle: 0, labelT: 0.5 };
+    if (!offsets[edge.id]) {
+      offsets[edge.id] = { fromAngle: 0, toAngle: 0, labelT: 0.5, lateral: 0, loopScale: 1, lane: 0 };
+    }
   });
 
   function spreadAngle(groups, field) {
     Object.values(groups).forEach((group) => {
       if (group.length <= 1) return;
       group.sort((a, b) => a.angle - b.angle);
+      const n = group.length;
+      const angleStep = Math.min(0.32, ANGLE_SPREAD + (n - 2) * 0.04);
       group.forEach((item, i) => {
-        const delta = (i - (group.length - 1) / 2) * ANGLE_SPREAD;
+        const delta = (i - (n - 1) / 2) * angleStep;
         offsets[item.edge.id][field] = delta;
         if (field === 'fromAngle') {
-          offsets[item.edge.id].labelT = 0.38 + (i / Math.max(1, group.length - 1)) * LABEL_T_SPREAD;
+          const lat = (i - (n - 1) / 2) * LATERAL_SPREAD;
+          offsets[item.edge.id].lateral = lat;
+          offsets[item.edge.id].loopScale = 1 + Math.abs(i - (n - 1) / 2) * 0.24;
+          offsets[item.edge.id].labelT = 0.28 + (i / Math.max(1, n - 1)) * LABEL_T_SPREAD;
         }
       });
     });
@@ -104,7 +121,7 @@ function loopSidePreference(fromNode, toNode, loopSide) {
   return goingBack ? 'below' : 'above';
 }
 
-function loopbackControls(p0, p3, fromNode, toNode, loopSide) {
+function loopbackControls(p0, p3, fromNode, toNode, loopSide, lateral = 0, loopScale = 1) {
   const dx = p3.x - p0.x;
   const dy = p3.y - p0.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -115,28 +132,62 @@ function loopbackControls(p0, p3, fromNode, toNode, loopSide) {
   if (wantDown && ny < 0) { nx = -nx; ny = -ny; }
   if (!wantDown && ny > 0) { nx = -nx; ny = -ny; }
 
-  const bulge = Math.max(52, len * 0.32 + 42);
-  const p1 = { x: p0.x + nx * bulge * 0.55 + dx * 0.12, y: p0.y + ny * bulge * 0.55 + dy * 0.12 };
-  const p2 = { x: p3.x + nx * bulge * 0.55 - dx * 0.12, y: p3.y + ny * bulge * 0.55 - dy * 0.12 };
+  const bulge = Math.max(52, len * 0.32 + 42) * loopScale;
+  const latShift = lateral * 0.4;
+  const p1 = {
+    x: p0.x + nx * (bulge * 0.55 + latShift) + dx * 0.12,
+    y: p0.y + ny * (bulge * 0.55 + latShift) + dy * 0.12,
+  };
+  const p2 = {
+    x: p3.x + nx * (bulge * 0.55 + latShift) - dx * 0.12,
+    y: p3.y + ny * (bulge * 0.55 + latShift) - dy * 0.12,
+  };
   return { p0, p1, p2, p3 };
 }
 
-function forwardControls(p0, p3, angleOut, angleIn) {
+function forwardControls(p0, p3, angleOut, angleIn, lateral = 0) {
   const dx = p3.x - p0.x;
   const dy = p3.y - p0.y;
   const dist = Math.hypot(dx, dy) || 1;
   const cpOffset = Math.min(dist * 0.45, 90);
+  const perpX = -Math.sin(angleOut) * lateral;
+  const perpY = Math.cos(angleOut) * lateral;
+  const blend = 0.6;
   return {
     p0,
-    p1: { x: p0.x + Math.cos(angleOut) * cpOffset, y: p0.y + Math.sin(angleOut) * cpOffset },
-    p2: { x: p3.x + Math.cos(angleIn) * cpOffset, y: p3.y + Math.sin(angleIn) * cpOffset },
+    p1: {
+      x: p0.x + Math.cos(angleOut) * cpOffset + perpX * blend,
+      y: p0.y + Math.sin(angleOut) * cpOffset + perpY * blend,
+    },
+    p2: {
+      x: p3.x + Math.cos(angleIn) * cpOffset + perpX * blend,
+      y: p3.y + Math.sin(angleIn) * cpOffset + perpY * blend,
+    },
     p3,
   };
 }
 
 export function edgePathControls(fromNode, toNode, routing, anchorOffsets, loopSide) {
-  const baseAngle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
   const off = anchorOffsets || { fromAngle: 0, toAngle: 0 };
+
+  if (routing === 'orthogonal') {
+    const points = buildOrthogonalPoints(fromNode, toNode, off);
+    return { kind: 'polyline', points };
+  }
+
+  if (routing === 'loopback') {
+    const baseAngle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+    const angleOut = baseAngle + (off.fromAngle || 0);
+    const angleIn = baseAngle + Math.PI + (off.toAngle || 0);
+    const p0 = boundaryPointAtAngle(fromNode, angleOut);
+    const p3 = boundaryPointAtAngle(toNode, angleIn);
+    return {
+      kind: 'cubic',
+      ...loopbackControls(p0, p3, fromNode, toNode, loopSide, off.lateral || 0, off.loopScale || 1),
+    };
+  }
+
+  const baseAngle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
   const angleOut = baseAngle + (off.fromAngle || 0);
   const angleIn = baseAngle + Math.PI + (off.toAngle || 0);
   const p0 = boundaryPointAtAngle(fromNode, angleOut);
@@ -145,20 +196,19 @@ export function edgePathControls(fromNode, toNode, routing, anchorOffsets, loopS
   if (routing === 'straight') {
     return { kind: 'line', p0, p3 };
   }
-  if (routing === 'loopback' || isLoopbackEdge(fromNode, toNode, routing)) {
-    return { kind: 'cubic', ...loopbackControls(p0, p3, fromNode, toNode, loopSide) };
-  }
-  return { kind: 'cubic', ...forwardControls(p0, p3, angleOut, angleIn) };
+  return { kind: 'cubic', ...forwardControls(p0, p3, angleOut, angleIn, off.lateral || 0) };
 }
 
 export function buildEdgePath(fromNode, toNode, routing, anchorOffsets, loopSide) {
   const ctrl = edgePathControls(fromNode, toNode, routing, anchorOffsets, loopSide);
+  if (ctrl.kind === 'polyline') return polylineToPath(ctrl.points);
   if (ctrl.kind === 'line') return `M ${ctrl.p0.x} ${ctrl.p0.y} L ${ctrl.p3.x} ${ctrl.p3.y}`;
   return `M ${ctrl.p0.x} ${ctrl.p0.y} C ${ctrl.p1.x} ${ctrl.p1.y}, ${ctrl.p2.x} ${ctrl.p2.y}, ${ctrl.p3.x} ${ctrl.p3.y}`;
 }
 
 export function edgePathSamplePoints(fromNode, toNode, routing, anchorOffsets, loopSide) {
   const ctrl = edgePathControls(fromNode, toNode, routing, anchorOffsets, loopSide);
+  if (ctrl.kind === 'polyline') return ctrl.points;
   if (ctrl.kind === 'line') return [ctrl.p0, ctrl.p3];
   return sampleCubic(ctrl.p0, ctrl.p1, ctrl.p2, ctrl.p3);
 }
@@ -196,7 +246,7 @@ export function labelPosition(pathEl, position, offset, t) {
 
   switch (position) {
     case 'below':
-      return { x: pt.x - nx * off, y: pt.y - ny * off, angle: Math.atan2(dy, dx) };
+      return { x: pt.x + nx * off, y: pt.y + ny * off, angle: Math.atan2(dy, dx) };
     case 'left':
       return { x: pt.x - (dx / mag) * off, y: pt.y - (dy / mag) * off, angle: Math.atan2(dy, dx) };
     case 'right':
@@ -205,7 +255,7 @@ export function labelPosition(pathEl, position, offset, t) {
       return { x: pt.x, y: pt.y, angle: Math.atan2(dy, dx) };
     case 'above':
     default:
-      return { x: pt.x + nx * off, y: pt.y + ny * off, angle: Math.atan2(dy, dx) };
+      return { x: pt.x - nx * off, y: pt.y - ny * off, angle: Math.atan2(dy, dx) };
   }
 }
 

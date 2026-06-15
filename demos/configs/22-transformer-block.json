@@ -1,23 +1,271 @@
 {
   "title": "Decoder layer",
-  "viewport": { "height": 400, "padding": 60 },
-  "tokens": { "color": "#7C3AED", "size": 5, "speed": 75 },
+  "viewport": {
+    "height": 400,
+    "padding": 60
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "size": 5,
+    "speed": 75
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "size": 5,
+      "speed": 75
+    },
+    "next": {
+      "color": "#D97706",
+      "shape": "circle",
+      "size": 5,
+      "speed": 70
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "embed", "type": "port", "role": "source", "shape": "circle", "icon": "binary", "x": 80, "y": 200 },
-    { "id": "mha", "type": "process", "label": "Multi-Head Attn", "icon": "git-branch", "duration": 1400, "x": 230, "y": 200 },
-    { "id": "norm1", "type": "process", "label": "Add+Norm", "icon": "plus", "duration": 250, "x": 390, "y": 200 },
-    { "id": "ffn", "type": "process", "label": "FFN", "icon": "workflow", "duration": 1100, "x": 530, "y": 200 },
-    { "id": "norm2", "type": "process", "label": "Add+Norm", "icon": "plus", "duration": 250, "retry": { "backEdge": "loop", "maxRetries": 3 }, "x": 670, "y": 200 },
-    { "id": "lm", "type": "port", "role": "terminal", "label": "LM head", "icon": "text", "tone": "success", "x": 670, "y": 340 }
+    {
+      "id": "embed",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "binary",
+      "x": 80,
+      "y": 200
+    },
+    {
+      "id": "mha",
+      "type": "process",
+      "label": "Multi-Head Attn",
+      "icon": "git-branch",
+      "x": 230,
+      "y": 200
+    },
+    {
+      "id": "norm1",
+      "type": "process",
+      "label": "Add+Norm",
+      "icon": "plus",
+      "x": 390,
+      "y": 200
+    },
+    {
+      "id": "ffn",
+      "type": "process",
+      "label": "FFN",
+      "icon": "workflow",
+      "x": 530,
+      "y": 200
+    },
+    {
+      "id": "norm2",
+      "type": "process",
+      "label": "Add+Norm",
+      "icon": "plus",
+      "x": 670,
+      "y": 200
+    },
+    {
+      "id": "lm",
+      "type": "port",
+      "role": "terminal",
+      "label": "LM head",
+      "icon": "text",
+      "tone": "success",
+      "x": 670,
+      "y": 340
+    }
   ],
   "edges": [
-    { "id": "e0", "from": "embed", "to": "mha", "label": { "text": "tokens" } },
-    { "id": "e1", "from": "mha", "to": "norm1", "label": { "text": "attn" } },
-    { "id": "e2", "from": "norm1", "to": "ffn" },
-    { "id": "e3", "from": "ffn", "to": "norm2" },
-    { "id": "e4", "from": "norm2", "to": "lm", "label": { "text": "logit" } },
-    { "id": "loop", "from": "norm2", "to": "mha", "routing": "loopback", "stroke": { "dash": "dash", "color": "primary" },
-      "label": { "text": "next token" } }
+    {
+      "id": "e0",
+      "from": "embed",
+      "to": "mha",
+      "label": {
+        "text": "tokens"
+      }
+    },
+    {
+      "id": "e1",
+      "from": "mha",
+      "to": "norm1",
+      "label": {
+        "text": "attn"
+      }
+    },
+    {
+      "id": "e2",
+      "from": "norm1",
+      "to": "ffn"
+    },
+    {
+      "id": "e3",
+      "from": "ffn",
+      "to": "norm2"
+    },
+    {
+      "id": "e4",
+      "from": "norm2",
+      "to": "lm",
+      "label": {
+        "text": "logit"
+      }
+    },
+    {
+      "id": "loop",
+      "from": "norm2",
+      "to": "mha",
+      "routing": "loopback",
+      "stroke": {
+        "dash": "dash",
+        "color": "primary"
+      },
+      "label": {
+        "text": "next token"
+      }
+    }
   ],
-  "sources": [{ "edge": "e0", "interval": 5500, "burst": { "count": 4, "spacing": 50 } }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Bloco Transformer (decoder)",
+          "description": "Cada token passa por atenção multi-cabeça e FFN; na geração autoregressiva, o próximo token realimenta o bloco via loopback.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "e0",
+          "token": "default",
+          "title": "Tokens → MHA",
+          "description": "Sequência [BOS, \"O\", \"gato\"] entra no bloco decoder."
+        }
+      },
+      {
+        "setPill": {
+          "node": "mha",
+          "pill": "t=3",
+          "tone": "primary",
+          "title": "Posição atual",
+          "description": "Atenção causal: token na posição 3 só vê posições anteriores."
+        }
+      },
+      {
+        "dwell": {
+          "node": "mha",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "Multi-Head Attention",
+          "description": "Q·Kᵀ/√dₖ com máscara causal; 12 cabeças em paralelo."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "MHA → Add+Norm",
+          "description": "Saída da atenção somada ao residual (pre-norm)."
+        }
+      },
+      {
+        "dwell": {
+          "node": "norm1",
+          "effect": "processing",
+          "ms": 250,
+          "title": "Add + LayerNorm",
+          "description": "x + Attention(x) normalizado."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "Norm → FFN",
+          "description": "Representação enriquecida segue para o feed-forward."
+        }
+      },
+      {
+        "dwell": {
+          "node": "ffn",
+          "effect": "processing",
+          "ms": 1100,
+          "title": "FFN",
+          "description": "Linear → GELU → Linear; dimensão interna 4× d_model."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "default",
+          "title": "FFN → Add+Norm",
+          "description": "Segunda conexão residual + normalização."
+        }
+      },
+      {
+        "dwell": {
+          "node": "norm2",
+          "effect": "processing",
+          "ms": 250,
+          "title": "Add + LayerNorm",
+          "description": "Saída final do bloco para a posição t=3."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e4",
+          "token": "default",
+          "title": "Norm → LM head",
+          "description": "Projeção linear gera logits sobre o vocabulário."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Passo autoregressivo",
+          "description": "O token amostrado (\"está\") é incorporado à sequência e o bloco processa t=4.",
+          "ms": 800
+        }
+      },
+      {
+        "setPill": {
+          "node": "mha",
+          "pill": "t=4",
+          "tone": "warning",
+          "title": "Próximo token",
+          "description": "KV-cache evita recomputar atenção das posições anteriores."
+        }
+      },
+      {
+        "travel": {
+          "edge": "loop",
+          "token": "next",
+          "title": "Loopback → MHA",
+          "description": "Novo embedding do token \"está\" realimenta o bloco para o próximo passo."
+        }
+      },
+      {
+        "dwell": {
+          "node": "mha",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "MHA — decode step",
+          "description": "Apenas a nova posição é computada; cache reutiliza K/V anteriores."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

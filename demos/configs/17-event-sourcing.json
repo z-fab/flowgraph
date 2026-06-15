@@ -1,24 +1,293 @@
 {
   "title": "Event log",
-  "viewport": { "height": 360, "padding": 55 },
+  "viewport": {
+    "height": 360,
+    "padding": 55
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    },
+    "event": {
+      "color": "#3D6B52",
+      "shape": "rect",
+      "size": 5
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "cmd", "type": "port", "role": "source", "label": "Command", "shape": "circle", "icon": "terminal", "x": 80, "y": 180 },
-    { "id": "agg", "type": "process", "label": "Aggregate", "icon": "box", "duration": 500, "x": 230, "y": 180 },
-    { "id": "log", "type": "process", "label": "Event log", "icon": "scroll-text",
-      "admission": { "mode": "batch", "max": 3, "step": 1 }, "duration": 200,
-      "pillTop": [{ "text": "append-only", "tone": "primary" }], "x": 390, "y": 180 },
-    { "id": "proj1", "type": "process", "label": "Projection A", "icon": "eye", "duration": 700, "x": 560, "y": 100 },
-    { "id": "proj2", "type": "process", "label": "Projection B", "icon": "eye", "duration": 600, "x": 560, "y": 260 },
-    { "id": "read1", "type": "port", "role": "sink", "label": "Read model A", "icon": "table", "tone": "success", "x": 720, "y": 100 },
-    { "id": "read2", "type": "port", "role": "sink", "label": "Read model B", "icon": "table", "tone": "success", "x": 720, "y": 260 }
+    {
+      "id": "cmd",
+      "type": "port",
+      "role": "source",
+      "label": "Command",
+      "shape": "circle",
+      "icon": "terminal",
+      "x": 80,
+      "y": 180
+    },
+    {
+      "id": "agg",
+      "type": "process",
+      "label": "Aggregate",
+      "icon": "box",
+      "x": 230,
+      "y": 180
+    },
+    {
+      "id": "log",
+      "type": "process",
+      "label": "Event log",
+      "icon": "scroll-text",
+      "pillTop": [
+        {
+          "text": "append-only",
+          "tone": "primary"
+        }
+      ],
+      "x": 390,
+      "y": 180
+    },
+    {
+      "id": "proj1",
+      "type": "process",
+      "label": "Projection A",
+      "icon": "eye",
+      "x": 560,
+      "y": 100
+    },
+    {
+      "id": "proj2",
+      "type": "process",
+      "label": "Projection B",
+      "icon": "eye",
+      "x": 560,
+      "y": 260
+    },
+    {
+      "id": "read1",
+      "type": "port",
+      "role": "sink",
+      "label": "Read model A",
+      "icon": "table",
+      "tone": "success",
+      "x": 720,
+      "y": 100
+    },
+    {
+      "id": "read2",
+      "type": "port",
+      "role": "sink",
+      "label": "Read model B",
+      "icon": "table",
+      "tone": "success",
+      "x": 720,
+      "y": 260
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "cmd", "to": "agg" },
-    { "id": "e2", "from": "agg", "to": "log" },
-    { "id": "e3", "from": "log", "to": "proj1" },
-    { "id": "e4", "from": "log", "to": "proj2" },
-    { "id": "e5", "from": "proj1", "to": "read1" },
-    { "id": "e6", "from": "proj2", "to": "read2" }
+    {
+      "id": "e1",
+      "from": "cmd",
+      "to": "agg"
+    },
+    {
+      "id": "e-ack",
+      "from": "agg",
+      "to": "cmd",
+      "routing": "bezier",
+      "stroke": { "color": "success", "dash": "dash" },
+      "label": { "text": "202 Accepted" }
+    },
+    {
+      "id": "e2",
+      "from": "agg",
+      "to": "log"
+    },
+    {
+      "id": "e3",
+      "from": "log",
+      "to": "proj1"
+    },
+    {
+      "id": "e4",
+      "from": "log",
+      "to": "proj2"
+    },
+    {
+      "id": "e5",
+      "from": "proj1",
+      "to": "read1"
+    },
+    {
+      "id": "e6",
+      "from": "proj2",
+      "to": "read2"
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 3000, "burst": { "count": 2, "spacing": 100 } }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Event Sourcing",
+          "description": "Comandos viram eventos imutáveis no log; projeções independentes constroem modelos de leitura otimizados para cada consumidor.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Command → Aggregate",
+          "description": "Comando PlaceOrder(orderId=42, items=[…]) chega ao agregado Pedido."
+        }
+      },
+      {
+        "dwell": {
+          "node": "agg",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Aggregate",
+          "description": "Valida regras de negócio: estoque disponível, limite de crédito OK."
+        }
+      },
+      {
+        "setPill": {
+          "node": "agg",
+          "pill": "validated",
+          "tone": "success",
+          "title": "Comando aceito",
+          "description": "Agregado emite evento de domínio OrderPlaced."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e-ack",
+          "token": "default",
+          "title": "202 → Caller",
+          "description": "Confirmação assíncrona ao emissor do comando."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "event",
+          "title": "Aggregate → Event log",
+          "description": "Evento serializado e anexado ao stream append-only."
+        }
+      },
+      {
+        "dwell": {
+          "node": "log",
+          "effect": "processing",
+          "ms": 200,
+          "title": "Event log",
+          "description": "Offset #1847 persistido com garantia de durabilidade."
+        }
+      },
+      {
+        "setPill": {
+          "node": "log",
+          "pill": "offset #1847",
+          "tone": "primary",
+          "title": "Evento persistido",
+          "description": "Log imutável — fonte única da verdade."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Fan-out para projeções",
+          "description": "Cada projeção consome o mesmo evento e atualiza seu read model de forma independente.",
+          "ms": 700
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "e3",
+              "token": "event",
+              "title": "Log → Projection A",
+              "description": "Projeção de estoque decrementa unidades reservadas."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e4",
+              "token": "event",
+              "delay": 60,
+              "title": "Log → Projection B",
+              "description": "Projeção de faturamento registra receita pendente."
+            }
+          }
+        ]
+      },
+      {
+        "parallel": [
+          {
+            "dwell": {
+              "node": "proj1",
+              "effect": "processing",
+              "ms": 700,
+              "title": "Projection A — estoque",
+              "description": "Tabela inventory atualizada: SKU-99 qty -= 2."
+            }
+          },
+          {
+            "dwell": {
+              "node": "proj2",
+              "effect": "processing",
+              "ms": 600,
+              "title": "Projection B — faturamento",
+              "description": "Tabela revenue_pending += R$ 149,90."
+            }
+          }
+        ]
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "e5",
+              "token": "default",
+              "title": "Read model A",
+              "description": "Dashboard de estoque reflete reserva imediata."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e6",
+              "token": "default",
+              "delay": 80,
+              "title": "Read model B",
+              "description": "Relatório financeiro mostra pedido pendente."
+            }
+          }
+        ]
+      },
+      {
+        "setPill": {
+          "node": "log",
+          "pill": "append-only",
+          "tone": "primary",
+          "title": "Ciclo completo",
+          "description": "Evento processado por todas as projeções — pronto para o próximo comando."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

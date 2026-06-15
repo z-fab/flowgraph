@@ -1,16 +1,163 @@
 {
   "title": "Train → register",
-  "viewport": { "height": 300, "padding": 50 },
+  "viewport": {
+    "height": 300,
+    "padding": 50
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "data", "type": "port", "role": "source", "label": "Dataset", "shape": "circle", "icon": "table", "x": 80, "y": 150 },
-    { "id": "train", "type": "process", "label": "Train", "icon": "graduation-cap", "duration": 2000, "x": 240, "y": 150, "tone": "warning" },
-    { "id": "val", "type": "process", "label": "Validate", "icon": "chart-line", "duration": 800, "x": 400, "y": 150 },
-    { "id": "registry", "type": "port", "role": "terminal", "label": "Registry", "icon": "package", "tone": "success", "x": 560, "y": 150 }
+    {
+      "id": "data",
+      "type": "port",
+      "role": "source",
+      "label": "Dataset",
+      "shape": "circle",
+      "icon": "table",
+      "x": 80,
+      "y": 150
+    },
+    {
+      "id": "train",
+      "type": "process",
+      "label": "Train",
+      "icon": "graduation-cap",
+      "x": 240,
+      "y": 150,
+      "tone": "warning"
+    },
+    {
+      "id": "val",
+      "type": "process",
+      "label": "Validate",
+      "icon": "chart-line",
+      "x": 400,
+      "y": 150
+    },
+    {
+      "id": "registry",
+      "type": "port",
+      "role": "terminal",
+      "label": "Registry",
+      "icon": "package",
+      "tone": "success",
+      "x": 560,
+      "y": 150
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "data", "to": "train" },
-    { "id": "e2", "from": "train", "to": "val" },
-    { "id": "e3", "from": "val", "to": "registry", "stroke": { "color": "success" } }
+    {
+      "id": "e1",
+      "from": "data",
+      "to": "train"
+    },
+    {
+      "id": "e2",
+      "from": "train",
+      "to": "val"
+    },
+    {
+      "id": "e3",
+      "from": "val",
+      "to": "registry",
+      "stroke": {
+        "color": "success"
+      }
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 6000 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Ciclo de treinamento",
+          "description": "Dataset versionado alimenta o treino, validação mede generalização e o artefato vai para o Model Registry.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Dataset v3.2",
+          "description": "Split treino (80%) carregado do feature store com 1.2M amostras."
+        }
+      },
+      {
+        "dwell": {
+          "node": "train",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "Train",
+          "description": "PyTorch treina MLP — 50 épocas, Adam lr=1e-3, early stopping."
+        }
+      },
+      {
+        "setPill": {
+          "node": "train",
+          "pill": "loss 0.12",
+          "tone": "warning",
+          "title": "Convergência",
+          "description": "Loss de treino estabilizou na época 38."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "Checkpoint → val",
+          "description": "Pesos salvos seguem para avaliação no holdout."
+        }
+      },
+      {
+        "dwell": {
+          "node": "val",
+          "effect": "processing",
+          "ms": 800,
+          "title": "Validate",
+          "description": "Métricas no conjunto de validação: AUC=0.94, F1=0.89."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Gate de qualidade",
+          "description": "Só modelos que passam no threshold de AUC (>0.90) são promovidos ao registry.",
+          "ms": 700
+        }
+      },
+      {
+        "setEffect": {
+          "node": "val",
+          "effect": "open",
+          "title": "Aprovado",
+          "description": "Métricas acima do baseline — elegível para staging."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "default",
+          "title": "Register v4.0",
+          "description": "Artefato ONNX + metadata versionados no MLflow Model Registry."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

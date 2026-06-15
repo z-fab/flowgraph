@@ -1,4 +1,6 @@
 import { hydrateIcons, iconMarkup } from './icons.js';
+import { updateModeButtons, mountModeControls } from './step-controls.js';
+import { toggleFullscreen } from './fullscreen.js';
 
 function makeBtn(className, label, iconName) {
   const btn = document.createElement('button');
@@ -26,10 +28,11 @@ export function createChrome(root, instance, config) {
 
   const showToolbar = ctrls.toolbar !== false && (
     ctrls.playPause !== false
+    || ctrls.step !== false
+    || ctrls.fullscreen !== false
     || ctrls.zoomReset !== false
     || ctrls.reset !== false
     || ctrls.layout
-    || (ctrls.metricsDrawer !== false && config.metrics?.globalDrawer !== false && config.metrics?.systemPanel !== false)
   );
 
   if (!showToolbar && !chrome.childElementCount) {
@@ -53,8 +56,19 @@ export function createChrome(root, instance, config) {
   cluster.addEventListener('mousedown', (e) => e.stopPropagation());
   cluster.addEventListener('pointerdown', (e) => e.stopPropagation());
 
+  const modeWrap = document.createElement('div');
+  modeWrap.className = 'fg-controls-group fg-controls-group-mode';
+  cluster.appendChild(modeWrap);
+  mountModeControls(modeWrap, instance, config);
+
+  const transportWrap = document.createElement('div');
+  transportWrap.className = 'fg-controls-group fg-controls-group-transport';
+
+  const viewWrap = document.createElement('div');
+  viewWrap.className = 'fg-controls-group fg-controls-group-view';
+
   if (ctrls.playPause !== false) {
-    const playBtn = makeBtn('fg-btn', 'Play ou pausar simulação', 'pause');
+    const playBtn = makeBtn('fg-btn', 'Play ou pausar animação', 'pause');
     playBtn.setAttribute('aria-pressed', 'true');
     playBtn.dataset.iconPlay = 'play';
     playBtn.dataset.iconPause = 'pause';
@@ -63,9 +77,20 @@ export function createChrome(root, instance, config) {
       if (instance.running) instance.pause();
       else instance.start();
     });
-    cluster.appendChild(playBtn);
+    transportWrap.appendChild(playBtn);
     instance._playBtn = playBtn;
   }
+
+  if (ctrls.reset !== false) {
+    const resetBtn = makeBtn('fg-btn', 'Reiniciar animação', 'rotate-ccw');
+    resetBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      instance.reset();
+    });
+    transportWrap.appendChild(resetBtn);
+  }
+
+  if (transportWrap.childElementCount) cluster.appendChild(transportWrap);
 
   if (ctrls.zoomReset !== false) {
     const fitBtn = makeBtn('fg-btn', 'Centralizar diagrama', 'crosshair');
@@ -73,22 +98,17 @@ export function createChrome(root, instance, config) {
       e.stopPropagation();
       instance.fit();
     });
-    cluster.appendChild(fitBtn);
+    viewWrap.appendChild(fitBtn);
   }
 
-  const metricsOn = ctrls.metricsDrawer !== false
-    && config.metrics?.globalDrawer !== false
-    && config.metrics?.systemPanel !== false;
-  if (metricsOn) {
-    const metricsBtn = makeBtn('fg-btn', 'Métricas globais', 'activity');
-    metricsBtn.setAttribute('aria-pressed', 'false');
-    metricsBtn.addEventListener('click', (e) => {
-      e.preventDefault();
+  if (ctrls.fullscreen !== false) {
+    const fsBtn = makeBtn('fg-btn', 'Expandir diagrama', 'maximize-2');
+    fsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      instance.toggleGlobalDrawer?.();
+      toggleFullscreen(instance);
     });
-    cluster.appendChild(metricsBtn);
-    instance._metricsBtn = metricsBtn;
+    viewWrap.appendChild(fsBtn);
+    instance._fullscreenBtn = fsBtn;
   }
 
   if (ctrls.layout) {
@@ -97,24 +117,23 @@ export function createChrome(root, instance, config) {
       e.stopPropagation();
       instance.applyAutoLayout?.();
     });
-    cluster.appendChild(layoutBtn);
+    viewWrap.appendChild(layoutBtn);
   }
 
-  if (ctrls.reset !== false) {
-    const resetBtn = makeBtn('fg-btn', 'Reiniciar simulação', 'rotate-ccw');
-    resetBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      instance.reset();
-    });
-    cluster.appendChild(resetBtn);
-  }
+  if (viewWrap.childElementCount) cluster.appendChild(viewWrap);
 
   bar.appendChild(cluster);
-  chrome.appendChild(bar);
+
+  const dock = document.createElement('div');
+  dock.className = 'fg-chrome-dock';
+  dock.appendChild(bar);
+  chrome.appendChild(dock);
   root.appendChild(chrome);
 
   instance._chrome = chrome;
+  instance._chromeDock = dock;
   hydrateIcons(chrome);
+  updateModeButtons(instance);
   return chrome;
 }
 
@@ -125,21 +144,11 @@ export function updatePlayButton(instance) {
   instance._playBtn.innerHTML = iconMarkup(icon);
   hydrateIcons(instance._playBtn);
   instance._playBtn.setAttribute('aria-pressed', running ? 'true' : 'false');
-  instance._playBtn.setAttribute('aria-label', running ? 'Pausar simulação' : 'Iniciar simulação');
+  instance._playBtn.setAttribute('aria-label', running ? 'Pausar animação' : 'Iniciar animação');
 }
 
-/** aria-pressed só reflete o drawer global aberto */
-export function syncGlobalMetricsButton(instance) {
-  if (!instance._metricsBtn) return;
-  const open = instance._globalDrawer?.isOpen() ?? false;
-  instance._metricsBtn.setAttribute('aria-pressed', open ? 'true' : 'false');
-}
-
-/** Mantém chrome visível enquanto qualquer drawer estiver aberto */
 export function syncChromePinned(instance) {
-  const pinned = (instance._globalDrawer?.isOpen() ?? false)
-    || (instance._nodeDrawer?.isOpen() ?? false);
-  instance.root?.classList.toggle('fg-chrome-pinned', pinned);
+  instance.root?.classList.toggle('fg-chrome-pinned', instance.playbackMode === 'step');
 }
 
 export function setChromePinned(instance, pinned) {

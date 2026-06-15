@@ -1,0 +1,405 @@
+{
+  "title": "Transformer stack",
+  "viewport": {
+    "height": 480,
+    "padding": 60
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "size": 5,
+    "speed": 75
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "size": 5,
+      "speed": 75
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
+  "nodes": [
+    {
+      "id": "embed",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "binary",
+      "x": 60,
+      "y": 220,
+      "pillTop": [
+        {
+          "text": "tokens",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "mha",
+      "type": "process",
+      "label": "Multi-Head Attn",
+      "icon": "git-branch",
+      "x": 200,
+      "y": 220,
+      "pillTop": [
+        {
+          "text": "4 heads",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "h1",
+      "type": "process",
+      "label": "Head 1",
+      "icon": "circle",
+      "x": 370,
+      "y": 100
+    },
+    {
+      "id": "h2",
+      "type": "process",
+      "label": "Head 2",
+      "icon": "circle",
+      "x": 370,
+      "y": 220
+    },
+    {
+      "id": "h3",
+      "type": "process",
+      "label": "Head 3",
+      "icon": "circle",
+      "x": 370,
+      "y": 340
+    },
+    {
+      "id": "concat",
+      "type": "process",
+      "label": "Concat",
+      "icon": "layers",
+      "x": 520,
+      "y": 220,
+      "pillTop": [
+        {
+          "text": "fan-in",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "norm1",
+      "type": "process",
+      "label": "Add+Norm",
+      "icon": "plus",
+      "x": 650,
+      "y": 220
+    },
+    {
+      "id": "ffn",
+      "type": "process",
+      "label": "FFN",
+      "icon": "workflow",
+      "x": 780,
+      "y": 220
+    },
+    {
+      "id": "norm2",
+      "type": "process",
+      "label": "Add+Norm",
+      "icon": "plus",
+      "x": 910,
+      "y": 220
+    },
+    {
+      "id": "lm",
+      "type": "port",
+      "role": "terminal",
+      "label": "LM head",
+      "icon": "text",
+      "tone": "success",
+      "x": 910,
+      "y": 380
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "embed",
+      "to": "mha",
+      "label": {
+        "text": "QKV"
+      }
+    },
+    {
+      "id": "eh1",
+      "from": "mha",
+      "to": "h1"
+    },
+    {
+      "id": "eh2",
+      "from": "mha",
+      "to": "h2"
+    },
+    {
+      "id": "eh3",
+      "from": "mha",
+      "to": "h3"
+    },
+    {
+      "id": "ch1",
+      "from": "h1",
+      "to": "concat"
+    },
+    {
+      "id": "ch2",
+      "from": "h2",
+      "to": "concat"
+    },
+    {
+      "id": "ch3",
+      "from": "h3",
+      "to": "concat"
+    },
+    {
+      "id": "cn",
+      "from": "concat",
+      "to": "norm1"
+    },
+    {
+      "id": "nf",
+      "from": "norm1",
+      "to": "ffn"
+    },
+    {
+      "id": "fn",
+      "from": "ffn",
+      "to": "norm2"
+    },
+    {
+      "id": "eout",
+      "from": "norm2",
+      "to": "lm",
+      "label": {
+        "text": "logit"
+      },
+      "stroke": {
+        "color": "success"
+      }
+    }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left"
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Bloco Transformer",
+          "description": "Atenção multi-cabeça paralela, concatenação fan-in e FFN com residual.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "e0",
+          "token": "default",
+          "title": "Embeddings → MHA",
+          "description": "Projeções Q, K, V a partir dos tokens."
+        }
+      },
+      {
+        "dwell": {
+          "node": "mha",
+          "effect": "processing",
+          "ms": 450,
+          "title": "Multi-Head Attn",
+          "description": "Divide d_model em 4 subespaços independentes."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Fan-out — heads paralelas",
+          "description": "Cada cabeça calcula softmax(QKᵀ/√d)V em paralelo.",
+          "ms": 700
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "eh1",
+              "token": "default",
+              "title": "→ Head 1"
+            }
+          },
+          {
+            "travel": {
+              "edge": "eh2",
+              "token": "default",
+              "title": "→ Head 2",
+              "delay": 100
+            }
+          },
+          {
+            "travel": {
+              "edge": "eh3",
+              "token": "default",
+              "title": "→ Head 3",
+              "delay": 200
+            }
+          }
+        ]
+      },
+      {
+        "parallel": [
+          {
+            "dwell": {
+              "node": "h1",
+              "effect": "processing",
+              "ms": 400,
+              "title": "Head 1",
+              "description": "Padrões locais de atenção."
+            }
+          },
+          {
+            "dwell": {
+              "node": "h2",
+              "effect": "processing",
+              "ms": 400,
+              "title": "Head 2",
+              "delay": 80
+            }
+          },
+          {
+            "dwell": {
+              "node": "h3",
+              "effect": "processing",
+              "ms": 400,
+              "title": "Head 3",
+              "delay": 160
+            }
+          }
+        ]
+      },
+      {
+        "narrate": {
+          "title": "Fan-in — Concat",
+          "description": "Saídas das heads são concatenadas e projetadas de volta a d_model.",
+          "ms": 700
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "ch1",
+              "token": "default",
+              "title": "Head 1 → Concat"
+            }
+          },
+          {
+            "travel": {
+              "edge": "ch2",
+              "token": "default",
+              "title": "Head 2 → Concat",
+              "delay": 100
+            }
+          },
+          {
+            "travel": {
+              "edge": "ch3",
+              "token": "default",
+              "title": "Head 3 → Concat",
+              "delay": 200
+            }
+          }
+        ]
+      },
+      {
+        "dwell": {
+          "node": "concat",
+          "effect": "waiting",
+          "ms": 200,
+          "title": "Concat",
+          "description": "Aguarda todas as heads antes do merge."
+        }
+      },
+      {
+        "dwell": {
+          "node": "concat",
+          "effect": "processing",
+          "ms": 220,
+          "title": "Concat",
+          "description": "torch.cat + projeção linear."
+        }
+      },
+      {
+        "travel": {
+          "edge": "cn",
+          "token": "default",
+          "title": "Concat → Add+Norm",
+          "description": "Residual connection + LayerNorm."
+        }
+      },
+      {
+        "dwell": {
+          "node": "norm1",
+          "effect": "processing",
+          "ms": 180,
+          "title": "Add+Norm",
+          "description": "x + attn_out, normalizado."
+        }
+      },
+      {
+        "travel": {
+          "edge": "nf",
+          "token": "default",
+          "title": "→ FFN",
+          "description": "Feed-forward de duas camadas."
+        }
+      },
+      {
+        "dwell": {
+          "node": "ffn",
+          "effect": "processing",
+          "ms": 900,
+          "title": "FFN",
+          "description": "Linear → GELU → Linear (4× d_model)."
+        }
+      },
+      {
+        "travel": {
+          "edge": "fn",
+          "token": "default",
+          "title": "FFN → Add+Norm"
+        }
+      },
+      {
+        "dwell": {
+          "node": "norm2",
+          "effect": "processing",
+          "ms": 180,
+          "title": "Add+Norm",
+          "description": "Segundo residual + normalização."
+        }
+      },
+      {
+        "travel": {
+          "edge": "eout",
+          "token": "default",
+          "title": "Logits → LM head",
+          "description": "Projeção final para vocabulário."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
+}

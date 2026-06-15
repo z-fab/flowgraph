@@ -1,0 +1,169 @@
+{
+  "title": "Dead letter queue",
+  "viewport": { "height": 380, "padding": 55 },
+  "tokenTypes": {
+    "msg": { "color": "#7C3AED", "speed": 100, "shape": "roundedRect", "size": 7 },
+    "retry": { "color": "#D97706", "speed": 85, "shape": "rect", "size": 6 },
+    "dlq": { "color": "#9B1C1C", "speed": 70, "shape": "rect", "size": 6 }
+  },
+  "controls": { "metricsDrawer": false },
+  "nodes": [
+    { "id": "producer", "type": "port", "role": "source", "label": "Producer", "icon": "send", "shape": "circle", "x": 70, "y": 190 },
+    { "id": "queue", "type": "process", "label": "Main queue", "icon": "layers", "x": 230, "y": 190, "pillTop": [{ "text": "depth 12", "tone": "primary" }] },
+    { "id": "worker", "type": "process", "label": "Consumer", "icon": "cpu", "x": 400, "y": 190, "pillTop": [{ "text": "attempt 1", "tone": "warning" }] },
+    { "id": "db", "type": "process", "label": "Downstream DB", "icon": "database", "x": 400, "y": 310 },
+    { "id": "retry", "type": "process", "label": "Retry topic", "icon": "refresh-cw", "x": 400, "y": 70, "pillTop": [{ "text": "backoff", "tone": "warning" }] },
+    { "id": "dlq", "type": "port", "role": "sink", "label": "DLQ", "icon": "archive", "tone": "danger", "x": 580, "y": 190 },
+    { "id": "ops", "type": "port", "role": "terminal", "label": "Ops alert", "icon": "bell", "tone": "danger", "x": 580, "y": 70 }
+  ],
+  "edges": [
+    { "id": "pq", "from": "producer", "to": "queue", "label": { "text": "publish" } },
+    { "id": "qw", "from": "queue", "to": "worker", "label": { "text": "deliver" } },
+    { "id": "wdb", "from": "worker", "to": "db", "label": { "text": "persist" }, "stroke": { "dash": "dot" } },
+    { "id": "wr", "from": "worker", "to": "retry", "routing": "loopback", "loopSide": "above", "stroke": { "dash": "dash", "color": "warning" }, "label": { "text": "nack" } },
+    { "id": "rq", "from": "retry", "to": "queue", "routing": "bezier", "stroke": { "color": "warning", "dash": "dot" }, "label": { "text": "requeue" } },
+    { "id": "wd", "from": "worker", "to": "dlq", "stroke": { "color": "danger", "width": 2 }, "label": { "text": "max retries" } },
+    { "id": "do", "from": "dlq", "to": "ops", "routing": "straight", "stroke": { "color": "danger", "dash": "dash" }, "label": { "text": "pager" } }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 500,
+    "narration": { "showOnCanvas": true, "position": "top-left", "maxWidth": 360 },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Retry com backoff exponencial",
+          "description": "Mensagem falha no consumer → retry topic → requeue. Após 3 tentativas vai para DLQ.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "pq",
+          "token": "msg",
+          "title": "Publish event",
+          "description": "`order.created` — partition 7."
+        }
+      },
+      {
+        "dwell": {
+          "node": "queue",
+          "effect": "processing",
+          "ms": 250,
+          "title": "Main queue",
+          "description": "Mensagem aguarda consumer disponível."
+        }
+      },
+      {
+        "travel": { "edge": "qw", "token": "msg", "title": "Deliver to worker" }
+      },
+      {
+        "travel": {
+          "edge": "wdb",
+          "token": "msg",
+          "title": "Write to DB",
+          "description": "Consumer tenta persistir no banco downstream."
+        }
+      },
+      {
+        "dwell": {
+          "node": "db",
+          "effect": "waiting",
+          "ms": 300,
+          "title": "DB timeout",
+          "description": "Downstream DB não responde — operação falha."
+        }
+      },
+      {
+        "dwell": {
+          "node": "worker",
+          "effect": "processing",
+          "ms": 450,
+          "title": "Attempt 1 — fail",
+          "description": "Timeout no downstream DB — nack."
+        }
+      },
+      {
+        "travel": {
+          "edge": "wr",
+          "token": "retry",
+          "title": "Nack → retry topic"
+        }
+      },
+      {
+        "setPill": { "node": "worker", "pill": "attempt 2", "tone": "warning" }
+      },
+      {
+        "setPill": { "node": "retry", "pill": "2s backoff", "tone": "warning" }
+      },
+      {
+        "travel": {
+          "edge": "rq",
+          "token": "retry",
+          "title": "Requeue",
+          "description": "Mensagem volta à fila principal após backoff."
+        }
+      },
+      {
+        "travel": { "edge": "qw", "token": "retry", "title": "Redeliver" }
+      },
+      {
+        "dwell": {
+          "node": "worker",
+          "effect": "waiting",
+          "ms": 400,
+          "title": "Attempt 2 — fail again"
+        }
+      },
+      {
+        "setPill": { "node": "worker", "pill": "attempt 3", "tone": "danger" }
+      },
+      {
+        "travel": { "edge": "wr", "token": "retry" }
+      },
+      {
+        "travel": { "edge": "rq", "token": "retry" }
+      },
+      {
+        "travel": { "edge": "qw", "token": "retry" }
+      },
+      {
+        "dwell": {
+          "node": "worker",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Attempt 3 — max exceeded"
+        }
+      },
+      {
+        "narrate": {
+          "title": "Dead letter queue",
+          "description": "Mensagem envenenada isolada — ops recebe alerta para triagem manual.",
+          "ms": 700
+        }
+      },
+      {
+        "travel": {
+          "edge": "wd",
+          "token": "dlq",
+          "title": "→ DLQ",
+          "description": "Poison message preservada com headers de debug."
+        }
+      },
+      {
+        "travel": {
+          "edge": "do",
+          "token": "dlq",
+          "title": "PagerDuty alert"
+        }
+      },
+      {
+        "setPill": { "node": "queue", "pill": "depth 11", "tone": "primary" }
+      },
+      {
+        "setPill": { "node": "worker", "pill": "idle", "tone": "primary" }
+      },
+      { "wait": { "ms": 1200 } }
+    ]
+  }
+}

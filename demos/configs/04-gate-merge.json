@@ -1,19 +1,137 @@
 {
   "title": "Join mode=all",
-  "viewport": { "height": 360, "padding": 55 },
+  "viewport": {
+    "height": 360,
+    "padding": 55
+  },
+  "tokenTypes": {
+    "default": { "color": "#7C3AED" }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "s1", "type": "port", "role": "source", "label": "Stream A", "shape": "circle", "icon": "database", "x": 100, "y": 100 },
-    { "id": "s2", "type": "port", "role": "source", "label": "Stream B", "shape": "circle", "icon": "hard-drive", "x": 100, "y": 260 },
-    { "id": "agg", "type": "process", "label": "Agregador", "icon": "git-merge", "gate": { "from": "all-edges", "count": 1 }, "duration": 1200, "x": 340, "y": 180 },
-    { "id": "out", "type": "port", "role": "terminal", "label": "Resultado", "tone": "success", "x": 540, "y": 180 }
+    {
+      "id": "s1",
+      "type": "port",
+      "role": "source",
+      "label": "Stream A",
+      "shape": "circle",
+      "icon": "database",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "id": "s2",
+      "type": "port",
+      "role": "source",
+      "label": "Stream B",
+      "shape": "circle",
+      "icon": "hard-drive",
+      "x": 100,
+      "y": 260
+    },
+    {
+      "id": "agg",
+      "type": "process",
+      "label": "Agregador",
+      "icon": "git-merge",
+      "x": 340,
+      "y": 180,
+      "pillTop": [{ "text": "waiting", "tone": "warning" }]
+    },
+    {
+      "id": "out",
+      "type": "port",
+      "role": "terminal",
+      "label": "Resultado",
+      "tone": "success",
+      "x": 540,
+      "y": 180
+    }
   ],
   "edges": [
-    { "id": "a", "from": "s1", "to": "agg", "label": { "text": "events A" } },
-    { "id": "b", "from": "s2", "to": "agg", "label": { "text": "events B" } },
+    {
+      "id": "a",
+      "from": "s1",
+      "to": "agg",
+      "label": { "text": "events A" }
+    },
+    {
+      "id": "b",
+      "from": "s2",
+      "to": "agg",
+      "label": { "text": "events B" }
+    },
     { "id": "c", "from": "agg", "to": "out" }
   ],
-  "sources": [
-    { "edge": "a", "interval": 2800, "jitter": 400, "token": { "color": "#7C3AED" } },
-    { "edge": "b", "interval": 3200, "jitter": 600, "token": { "color": "#3D6B52" } }
-  ]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": { "showOnCanvas": true, "position": "top-left" },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Join gate (all edges)",
+          "description": "O agregador só processa quando eventos de A e B chegaram.",
+          "ms": 700
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "a",
+              "token": "default",
+              "title": "Stream A",
+              "description": "Primeiro evento chega ao gate."
+            }
+          },
+          {
+            "travel": {
+              "edge": "b",
+              "token": "default",
+              "title": "Stream B",
+              "description": "Segundo evento completa o join.",
+              "delay": 280
+            }
+          }
+        ]
+      },
+      {
+        "setPill": {
+          "node": "agg",
+          "pill": "ready",
+          "tone": "success",
+          "title": "Gate satisfeito",
+          "description": "Ambas as arestas de entrada receberam tokens."
+        }
+      },
+      {
+        "dwell": {
+          "node": "agg",
+          "effect": "processing",
+          "ms": 600,
+          "title": "Agregador",
+          "description": "Merge dos eventos A + B."
+        }
+      },
+      {
+        "travel": {
+          "edge": "c",
+          "token": "default",
+          "title": "Resultado",
+          "description": "Evento agregado segue para a saída."
+        }
+      },
+      {
+        "setPill": {
+          "node": "agg",
+          "pill": "waiting",
+          "tone": "warning"
+        }
+      },
+      { "wait": { "ms": 1000 } }
+    ]
+  }
 }

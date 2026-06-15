@@ -1,0 +1,349 @@
+{
+  "title": "DDP all-reduce",
+  "viewport": {
+    "height": 420,
+    "padding": 55
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "shape": "roundedRect",
+    "size": 6,
+    "speed": 90
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "shape": "roundedRect",
+      "size": 6,
+      "speed": 90
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
+  "nodes": [
+    {
+      "id": "batch",
+      "type": "port",
+      "role": "source",
+      "label": "Global batch",
+      "shape": "circle",
+      "icon": "layers",
+      "x": 70,
+      "y": 210
+    },
+    {
+      "id": "split",
+      "type": "process",
+      "label": "Shard split",
+      "icon": "split",
+      "x": 210,
+      "y": 210,
+      "pillTop": [
+        {
+          "text": "÷3",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "r0",
+      "type": "process",
+      "label": "GPU 0",
+      "icon": "cpu",
+      "x": 400,
+      "y": 90,
+      "tone": "warning"
+    },
+    {
+      "id": "r1",
+      "type": "process",
+      "label": "GPU 1",
+      "icon": "cpu",
+      "x": 400,
+      "y": 210
+    },
+    {
+      "id": "r2",
+      "type": "process",
+      "label": "GPU 2",
+      "icon": "cpu",
+      "x": 400,
+      "y": 330,
+      "tone": "warning"
+    },
+    {
+      "id": "ar",
+      "type": "process",
+      "label": "All-Reduce",
+      "icon": "merge",
+      "x": 560,
+      "y": 210,
+      "pillTop": [
+        {
+          "text": "sync",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "optim",
+      "type": "process",
+      "label": "Optimizer",
+      "icon": "settings",
+      "x": 720,
+      "y": 210,
+      "tone": "success"
+    },
+    {
+      "id": "done",
+      "type": "port",
+      "role": "terminal",
+      "label": "Step complete",
+      "icon": "check",
+      "tone": "success",
+      "x": 880,
+      "y": 210
+    }
+  ],
+  "edges": [
+    {
+      "id": "eb",
+      "from": "batch",
+      "to": "split"
+    },
+    {
+      "id": "er0",
+      "from": "split",
+      "to": "r0",
+      "label": {
+        "text": "shard 0"
+      }
+    },
+    {
+      "id": "er1",
+      "from": "split",
+      "to": "r1",
+      "label": {
+        "text": "shard 1"
+      }
+    },
+    {
+      "id": "er2",
+      "from": "split",
+      "to": "r2",
+      "label": {
+        "text": "shard 2"
+      }
+    },
+    {
+      "id": "gr0",
+      "from": "r0",
+      "to": "ar",
+      "stroke": {
+        "color": "success"
+      }
+    },
+    {
+      "id": "gr1",
+      "from": "r1",
+      "to": "ar"
+    },
+    {
+      "id": "gr2",
+      "from": "r2",
+      "to": "ar"
+    },
+    {
+      "id": "ao",
+      "from": "ar",
+      "to": "optim",
+      "label": {
+        "text": "grads"
+      }
+    },
+    {
+      "id": "od",
+      "from": "optim",
+      "to": "done",
+      "stroke": {
+        "color": "success"
+      }
+    }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left"
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Treino distribuído (DDP)",
+          "description": "O batch global é dividido em 3 shards; cada GPU faz forward/backward local e sincroniza gradientes via all-reduce.",
+          "ms": 950
+        }
+      },
+      {
+        "travel": {
+          "edge": "eb",
+          "token": "default",
+          "title": "Global batch → Shard split",
+          "description": "Batch efetivo = soma dos micro-batches locais."
+        }
+      },
+      {
+        "dwell": {
+          "node": "split",
+          "effect": "processing",
+          "ms": 220,
+          "title": "Shard split",
+          "description": "Divide o batch em 3 partes iguais (÷3)."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Fan-out — 3 GPUs em paralelo",
+          "description": "Cada rank recebe seu shard e executa o passo de treino independentemente.",
+          "ms": 750
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "er0",
+              "token": "default",
+              "title": "→ GPU 0",
+              "description": "shard 0"
+            }
+          },
+          {
+            "travel": {
+              "edge": "er1",
+              "token": "default",
+              "title": "→ GPU 1",
+              "description": "shard 1",
+              "delay": 100
+            }
+          },
+          {
+            "travel": {
+              "edge": "er2",
+              "token": "default",
+              "title": "→ GPU 2",
+              "description": "shard 2",
+              "delay": 200
+            }
+          }
+        ]
+      },
+      {
+        "parallel": [
+          {
+            "dwell": {
+              "node": "r0",
+              "effect": "processing",
+              "ms": 500,
+              "title": "GPU 0",
+              "description": "Forward + backward local."
+            }
+          },
+          {
+            "dwell": {
+              "node": "r1",
+              "effect": "processing",
+              "ms": 500,
+              "title": "GPU 1",
+              "delay": 80
+            }
+          },
+          {
+            "dwell": {
+              "node": "r2",
+              "effect": "processing",
+              "ms": 500,
+              "title": "GPU 2",
+              "delay": 160
+            }
+          }
+        ]
+      },
+      {
+        "narrate": {
+          "title": "All-Reduce",
+          "description": "Gradientes locais são somados e replicados em todos os ranks — modelo idêntico em cada GPU.",
+          "ms": 800
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "gr0",
+              "token": "default",
+              "title": "GPU 0 → All-Reduce"
+            }
+          },
+          {
+            "travel": {
+              "edge": "gr1",
+              "token": "default",
+              "title": "GPU 1 → All-Reduce",
+              "delay": 100
+            }
+          },
+          {
+            "travel": {
+              "edge": "gr2",
+              "token": "default",
+              "title": "GPU 2 → All-Reduce",
+              "delay": 200
+            }
+          }
+        ]
+      },
+      {
+        "dwell": {
+          "node": "ar",
+          "effect": "processing",
+          "ms": 420,
+          "title": "All-Reduce",
+          "description": "Ring all-reduce: Σ grad_local / world_size."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ao",
+          "token": "default",
+          "title": "All-Reduce → Optimizer",
+          "description": "Gradientes sincronizados alimentam o step."
+        }
+      },
+      {
+        "dwell": {
+          "node": "optim",
+          "effect": "processing",
+          "ms": 300,
+          "title": "Optimizer",
+          "description": "optimizer.step() — mesmos pesos em todas as GPUs."
+        }
+      },
+      {
+        "travel": {
+          "edge": "od",
+          "token": "default",
+          "title": "Step complete",
+          "description": "Um training step distribuído concluído."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
+}

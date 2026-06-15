@@ -7,12 +7,11 @@ Use this profile when FlowGraph appears inside documentation, slides, or textboo
 ```json
 {
   "interaction": { "nodeDrag": false, "nodeSelect": false },
-  "controls": { "toolbar": false, "title": false },
-  "metrics": {
-    "nodeDrawer": false,
-    "globalDrawer": false,
-    "nodePanel": false,
-    "systemPanel": false
+  "controls": { "toolbar": false, "title": false, "step": false },
+  "scenario": {
+    "loop": true,
+    "defaultMode": "play",
+    "steps": [ ... ]
   }
 }
 ```
@@ -48,8 +47,7 @@ Lucide icons (optional but recommended for node icons):
     .then(r => r.json())
     .then(cfg => FG.create('#diagram', Object.assign({
       interaction: { nodeDrag: false, nodeSelect: false },
-      controls: { toolbar: false, title: false },
-      metrics: { nodeDrawer: false, globalDrawer: false, nodePanel: false, systemPanel: false }
+      controls: { toolbar: false, title: false, step: false }
     }, cfg)));
 </script>
 ```
@@ -62,24 +60,16 @@ Lucide icons (optional but recommended for node icons):
 <script type="module">
   import { FlowGraph } from '/assets/flowgraph.js';
   const cfg = await fetch('/configs/my-flow.json').then(r => r.json());
-  FlowGraph.create('#diagram', { /* embed flags above */, ...cfg });
+  FlowGraph.create('#diagram', {
+    ...cfg,
+    interaction: { nodeDrag: false, nodeSelect: false },
+    controls: { toolbar: false, title: false, step: false },
+  });
 </script>
 ```
 
-## Reference demo
+## Textbook kit (`tbFlow`)
 
-See [`demos/configs/27-embed-view.json`](../demos/configs/27-embed-view.json) and [`demos/27-embed-view.html`](../demos/27-embed-view.html).
+The textbook skill wraps FlowGraph v2 via `tbFlow(selector, config)` — see [skill-textbook `flowgraph.md`](https://github.com/z-fab/skill-textbook/blob/main/skill/references/flowgraph.md).
 
-## Authoring mode
-
-For playgrounds or internal tools, enable full chrome:
-
-```json
-{
-  "interaction": { "nodeDrag": true, "nodeSelect": true },
-  "controls": { "toolbar": true, "playPause": true, "zoomReset": true, "reset": true },
-  "metrics": { "nodeDrawer": true, "nodePanel": true }
-}
-```
-
-Demo: [`demos/configs/25-playground.json`](../demos/configs/25-playground.json).
+Bundle path inside the kit: `textbook/assets/vendor/flowgraph/`.

@@ -1,26 +1,24 @@
-import { parseConfig, applyNodePatch } from './config.js';
+import { parseConfig, resolveTokenType, autoLayout, needsLayout } from './config.js';
 import { graphBoundsWithEdges, graphBounds } from './geometry.js';
 import { createViewport } from './viewport.js';
 import { renderEdges } from './render-edge.js';
 import { renderNodes } from './render-node.js';
-import { ParticleSystem, spawnBurst } from './particles.js';
-import { SimulationEngine } from './simulation.js';
-import { MetricsStore } from './metrics.js';
-import { autoLayout, needsLayout } from './layout.js';
+import { ParticleSystem } from './particles.js';
+import { MultiTrackPlayer, FlowPlayer } from './flow-player.js';
+import { NodeStats } from './node-stats.js';
 import { applyCanvasBackground } from './ui/canvas-bg.js';
-import { createChrome, updatePlayButton, syncGlobalMetricsButton, syncChromePinned } from './ui/controls.js';
+import { createChrome, updatePlayButton, syncChromePinned } from './ui/controls.js';
+import { toggleFullscreen, closeFullscreen } from './ui/fullscreen.js';
+import { updateModeButtons } from './ui/step-controls.js';
+import { mountStepBar, updateStepBar } from './ui/step-bar.js';
+import { mountNarrationOverlay } from './ui/narration-overlay.js';
+import { mountScenarioPanel, updateScenarioPanel } from './ui/scenario-panel.js';
+import { travelTitle, travelDescription, dwellTitle, dwellDescription } from './scenario-labels.js';
 import { attachNodeDrag } from './interaction/drag.js';
-import {
-  mountGlobalDrawer,
-  mountNodeDrawer,
-  updateGlobalPanel,
-  updateNodePanel,
-  closeNodeDrawer,
-  refreshOpenPanels as refreshPanels,
-} from './ui/panels.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const CSS_HREF = 'flowgraph.css';
+const PLAYBACK_MODES = ['play', 'narrative', 'step'];
 
 function resolveTarget(target) {
   if (typeof target === 'string') return document.querySelector(target);
@@ -44,14 +42,19 @@ class FlowGraphInstance {
     this.running = false;
     this._raf = null;
     this._lastTs = 0;
-    this.metrics = new MetricsStore(this.config);
-    this._selectedNode = null;
-    this._metricsTimer = null;
+    this.playbackMode = this.config.scenario.defaultMode || 'play';
+    if (!PLAYBACK_MODES.includes(this.playbackMode)) this.playbackMode = 'play';
+    this.playSpeed = this.config.scenario.speed || 1;
+    this._stepping = false;
+    this._atNodeId = null;
+    this._stepHighlight = { nodeId: null, edgeId: null, edgeIds: [] };
+    this.nodeStats = new NodeStats(this.config.nodes);
 
     if (this.config.injectStyles) injectStylesheet();
 
     this._mount();
-    this._bindSimulation();
+    this._bindPlayer();
+    this._applyPlaybackMode(this.playbackMode, { initial: true });
 
     if (this.config.autoStart) this.start();
   }
@@ -117,33 +120,15 @@ class FlowGraphInstance {
     this.particles = new ParticleSystem(particlesLayer, this.edgeRenderer, cfg);
     this.viewport = createViewport(svg, viewportG, cfg, this.bounds);
 
-    mountGlobalDrawer(root, this, cfg);
-    mountNodeDrawer(root, this, cfg);
+    this._narration = mountNarrationOverlay(root, cfg, this);
     createChrome(root, this, cfg);
+    this._scenarioPanel = mountScenarioPanel(root, this, cfg);
+    if (!this._scenarioPanel) {
+      mountStepBar(this._chromeDock || root, this, cfg);
+    }
     this.container.appendChild(root);
 
     const nodeDrag = cfg.interaction?.nodeDrag !== false;
-    const nodeSelect = cfg.interaction?.nodeSelect !== false;
-    const nodeDrawerOn = cfg.metrics?.nodeDrawer !== false && cfg.metrics?.nodePanel !== false;
-
-    cfg.nodes.forEach((n) => {
-      const g = this.nodeRenderer.nodeViews[n.id]?.g;
-      if (!g) return;
-      if (nodeDrag) g.style.cursor = 'grab';
-      else if (nodeSelect) g.style.cursor = 'pointer';
-
-      if (!nodeSelect) return;
-      g.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this._nodeJustDragged) {
-          this._nodeJustDragged = false;
-          return;
-        }
-        this.selectNode(n.id);
-        if (nodeDrawerOn) updateNodePanel(this, n.id);
-      });
-    });
-
     if (nodeDrag) attachNodeDrag(this);
 
     this.nodeRenderer.refreshIcons();
@@ -158,63 +143,465 @@ class FlowGraphInstance {
     }
   }
 
-  selectNode(nodeId) {
-    if (this._selectedNode && this._selectedNode !== nodeId) {
-      this.nodeRenderer.setSelected(this._selectedNode, false);
-    }
-    this._selectedNode = nodeId;
-    this.nodeRenderer.setSelected(nodeId, true);
-    this._highlightEdges(nodeId);
+  _shouldNarrate() {
+    return this.playbackMode === 'narrative' || this.playbackMode === 'step';
   }
 
-  _highlightEdges(nodeId) {
-    const primary = this.config.theme.primary;
-    this.config.edges.forEach((e) => {
-      const hit = e.from === nodeId || e.to === nodeId;
-      this.edgeRenderer.setActive(e.id, hit, hit ? primary : null);
-      this.edgeRenderer.setDimmed(e.id, !hit);
-    });
+  _shouldHighlight() {
+    return this.playbackMode === 'narrative';
   }
 
-  _clearEdgeHighlight() {
-    this.config.edges.forEach((e) => {
-      this.edgeRenderer.setActive(e.id, false);
-      this.edgeRenderer.setDimmed(e.id, false);
-    });
+  _isManual() {
+    return this.playbackMode === 'step';
   }
 
-  updateNode(nodeId, patch) {
-    applyNodePatch(this.config, nodeId, patch);
-    this.sim.patchNode(nodeId, this.config.nodesById[nodeId]);
-    if (this._selectedNode === nodeId) this.refreshOpenPanels();
+  _refreshNodeMetrics(nodeId) {
+    const node = this.config.nodesById[nodeId];
+    if (!node?.metrics) return;
+    const auto = this.nodeStats.pillsFor(nodeId, node);
+    if (auto.length) this.nodeRenderer.setPillsBottom(nodeId, auto);
   }
 
-  toggleGlobalDrawer() {
-    if (this._globalDrawer?.isOpen()) {
-      this._globalDrawer.close();
+  _syncScenarioPanel() {
+    const narr = this.config.scenario?.narration?.showOnCanvas;
+    const stepMode = this.playbackMode === 'step';
+    const narrativeMode = this.playbackMode === 'narrative';
+
+    this._scenarioPanel?.show(!!(narr && stepMode), { stepMode });
+
+    if (narrativeMode && narr) {
+      this._narration?.setTrackPickerVisible(true);
+      this._narration?.syncTracks();
     } else {
-      this._globalDrawer?.open();
-      updateGlobalPanel(this);
+      this._narration?.setTrackPickerVisible(false);
     }
-    syncGlobalMetricsButton(this);
+
+    if (stepMode && narr) {
+      this._scenarioPanel?.setTrackSteps(this.player.activePlayer().steps);
+      updateScenarioPanel(this);
+    }
+    this._stepBar?.hide();
+  }
+
+  _bindPlayer() {
+    const cfg = this.config;
+    const hooks = {
+      shouldNarrate: () => this._shouldNarrate(),
+      shouldSkipNarratePause: () => this.playbackMode === 'play',
+      shouldSequentialParallel: () => this.playbackMode !== 'play',
+      onReset: () => {
+        this.particles.clear();
+        this.particles.setSpeedMultiplier(this.playSpeed);
+        this._applyStepHighlight(null);
+        this.nodeStats.reset();
+        cfg.nodes.forEach((n) => {
+          this.nodeRenderer.setEffect(n.id, null);
+          this.nodeRenderer.setActive(n.id, false);
+          if (n.metrics) this._refreshNodeMetrics(n.id);
+        });
+        this._atNodeId = null;
+        this._narration?.set('', '');
+        this._scenarioPanel?.reset();
+        this._syncScenarioPanel();
+      },
+      onStepStart: (step, _manual, _trackId, meta) => {
+        if (this.playbackMode !== 'step' || !this._scenarioPanel) return;
+        const idx = this._scenarioPanel.resolveIndex(step, meta);
+        if (idx >= 0) this._scenarioPanel.setActiveIndex(idx);
+      },
+      onNarration: () => {
+        updateScenarioPanel(this);
+        updateStepBar(this);
+      },
+      onStep: () => {
+        updateScenarioPanel(this);
+        updateStepBar(this);
+      },
+      travel: (step, manual, trackId) => this._runTravel(step, manual, trackId),
+      dwell: (step, manual) => this._runDwell(step, manual),
+      setPill: (step) => {
+        const node = cfg.nodesById[step.node];
+        if (!node) return;
+        if (step.pill != null) {
+          node.pillTop = [{ text: String(step.pill), tone: step.tone || 'primary' }];
+        }
+        this.nodeRenderer.setPillsTop(step.node, node.pillTop);
+      },
+      setEffect: (step) => {
+        const effect = step.effect || null;
+        this.nodeRenderer.setEffect(step.node, effect);
+        this.nodeRenderer.setActive(step.node, !!effect);
+        if (effect === 'open') {
+          const node = cfg.nodesById[step.node];
+          if (node) {
+            node.pillTop = [{ text: 'open', tone: 'danger' }];
+            this.nodeRenderer.setPillsTop(step.node, node.pillTop);
+          }
+        }
+      },
+      focus: (step) => {
+        if (!this._shouldHighlight()) return;
+        if (step.edge) {
+          const e = cfg.edgesById[step.edge];
+          this.viewport.focusOnNodes?.(e?.from, e?.to, cfg.nodesById);
+        } else if (step.node) {
+          this.viewport.focusOnNodes?.(step.node, step.node, cfg.nodesById);
+        }
+      },
+    };
+    this.player = new MultiTrackPlayer(cfg, hooks);
+    this.player.setSpeed(this.playSpeed);
+    this._syncScenarioPanel();
+  }
+
+  _scaled(ms) {
+    return Math.max(0, ms / (this.playSpeed || 1));
+  }
+
+  _stepBeat(ms) {
+    return new Promise((r) => setTimeout(r, this._scaled(ms)));
+  }
+
+  _applyStepHighlight(highlight) {
+    if (!this._shouldHighlight()) {
+      this.root?.classList.remove('fg-step-focus', 'fg-narrative-focus');
+      const prev = this._stepHighlight;
+      if (prev.nodeId) this.nodeRenderer.setStepActive(prev.nodeId, false);
+      if (prev.edgeId) this.edgeRenderer.setStepActive(prev.edgeId, false);
+      this._stepHighlight = { nodeId: null, edgeId: null, edgeIds: [] };
+      return;
+    }
+
+    const prev = this._stepHighlight;
+    if (prev.nodeId) this.nodeRenderer.setStepActive(prev.nodeId, false);
+    if (prev.edgeId) this.edgeRenderer.setStepActive(prev.edgeId, false);
+
+    this._stepHighlight = { nodeId: null, edgeId: null, edgeIds: [] };
+    this.root?.classList.remove('fg-step-focus', 'fg-narrative-focus');
+    if (!highlight) return;
+
+    const focusClass = this.playbackMode === 'step' ? 'fg-step-focus' : 'fg-narrative-focus';
+    this.root?.classList.add(focusClass);
+
+    const phase = highlight.phase || 'default';
+    if (phase === 'depart' || phase === 'origin') {
+      const fromId = highlight.fromNodeId || highlight.nodeId;
+      if (fromId) {
+        this.nodeRenderer.setStepActive(fromId, true);
+        this._stepHighlight.nodeId = fromId;
+      }
+      if (highlight.edgeId) {
+        this.edgeRenderer.setStepActive(highlight.edgeId, true);
+        this._stepHighlight.edgeId = highlight.edgeId;
+      }
+      return;
+    }
+    if (phase === 'moving' && highlight.edgeId) {
+      this.edgeRenderer.setStepActive(highlight.edgeId, true);
+      this._stepHighlight.edgeId = highlight.edgeId;
+      return;
+    }
+    if (phase === 'arrive') {
+      const toId = highlight.toNodeId || highlight.nodeId;
+      if (toId) {
+        this.nodeRenderer.setStepActive(toId, true);
+        this._stepHighlight.nodeId = toId;
+      }
+      return;
+    }
+    if (highlight.nodeId) {
+      this.nodeRenderer.setStepActive(highlight.nodeId, true);
+      this._stepHighlight.nodeId = highlight.nodeId;
+    }
+    if (highlight.edgeId) {
+      this.edgeRenderer.setStepActive(highlight.edgeId, true);
+      this._stepHighlight.edgeId = highlight.edgeId;
+    }
+  }
+
+  async _runTravel(step, manual) {
+    const cfg = this.config;
+    const edge = cfg.edgesById[step.edge];
+    if (!edge) return;
+
+    const reverse = step.direction === 'reverse';
+    const fromId = reverse ? edge.to : edge.from;
+    const toId = reverse ? edge.from : edge.to;
+    const tokenCfg = resolveTokenType(cfg, step.token || 'default', edge);
+
+    step.title = step.title || travelTitle(cfg, step.edge);
+    step.description = step.description || travelDescription(cfg, step.edge, step.direction || 'forward');
+
+    if (this._shouldNarrate()) {
+      if (this.playbackMode === 'narrative' || !this._scenarioPanel?.el || this._scenarioPanel.el.hidden) {
+        this._narration?.set(step.title, step.description);
+      }
+    }
+
+    const skipMetrics = step.countMetrics === false || tokenCfg.countMetrics === false;
+
+    const fromNode = cfg.nodesById[fromId];
+    if (fromNode?.metrics && !skipMetrics) {
+      this.nodeStats.onDepart(fromId);
+      this._refreshNodeMetrics(fromId);
+    }
+
+    this._atNodeId = fromId;
+    this.player.activePlayer().atNodeId = fromId;
+
+    if (this._shouldHighlight()) {
+      this._applyStepHighlight({ phase: 'depart', fromNodeId: fromId, edgeId: step.edge });
+      this.viewport.focusOnNodes?.(fromId, toId, cfg.nodesById);
+      if (!manual) await this._stepBeat(120);
+    }
+
+    if (this._shouldHighlight()) {
+      this._applyStepHighlight({ phase: 'moving', edgeId: step.edge });
+    }
+
+    await this.particles.travel(step.edge, tokenCfg, reverse);
+
+    const toNode = cfg.nodesById[toId];
+    if (toNode?.metrics && !skipMetrics) {
+      this.nodeStats.onArrive(toId);
+      this._refreshNodeMetrics(toId);
+    }
+
+    this._atNodeId = toId;
+    this.player.activePlayer().atNodeId = toId;
+
+    if (this._shouldHighlight()) {
+      this._applyStepHighlight({ phase: 'arrive', toNodeId: toId });
+      if (!manual) await this._stepBeat(150);
+    } else {
+      this._applyStepHighlight(null);
+    }
+  }
+
+  async _runDwell(step, manual) {
+    const cfg = this.config;
+    step.title = step.title || dwellTitle(cfg, step.node);
+    step.description = step.description || dwellDescription(cfg, step.node, step.effect);
+
+    if (this._shouldNarrate()) {
+      if (this.playbackMode === 'narrative' || !this._scenarioPanel?.el || this._scenarioPanel.el.hidden) {
+        this._narration?.set(step.title, step.description);
+      }
+    }
+
+    this._atNodeId = step.node;
+    this.player.activePlayer().atNodeId = step.node;
+
+    if (this._shouldHighlight()) {
+      this._applyStepHighlight({ nodeId: step.node, phase: 'default' });
+    }
+
+    const node = cfg.nodesById[step.node];
+    const effect = step.effect || 'processing';
+    const savedPillTop = node?.pillTop ? [...node.pillTop] : [];
+    this.nodeRenderer.setEffect(step.node, effect);
+    this.nodeRenderer.setActive(step.node, true);
+    if (effect === 'processing') {
+      this.nodeRenderer.setPillsTop(step.node, [
+        { text: 'running', tone: 'warning', animated: true, icon: '···' },
+      ]);
+    }
+
+    const base = manual ? 280 : (step.ms || 500);
+    const ms = this.playbackMode === 'play' ? base * 0.55 : base;
+    await this._stepBeat(ms);
+
+    this.nodeRenderer.setEffect(step.node, null);
+    this.nodeRenderer.setActive(step.node, false);
+    if (effect === 'processing' && node) {
+      this.nodeRenderer.setPillsTop(step.node, savedPillTop);
+    }
+    if (!this._shouldHighlight()) this._applyStepHighlight(null);
+  }
+
+  setPlaybackMode(mode) {
+    if (!PLAYBACK_MODES.includes(mode) || mode === this.playbackMode) return;
+    const keepRunning = this.running;
+    this._resetPlaybackState();
+    this._applyPlaybackMode(mode);
+    if (keepRunning) {
+      this.running = true;
+      if (!this._raf) {
+        this._lastTs = 0;
+        this._raf = requestAnimationFrame((t) => this._tick(t));
+      }
+      if (mode !== 'step') this._startAutoPlayback();
+    }
+    updatePlayButton(this);
+  }
+
+  _resetPlaybackState() {
+    this.player.stopAll();
+    this.player.reset();
+    this._applyStepHighlight(null);
+    this._atNodeId = null;
+    this._narration?.set('', '');
+    this._scenarioPanel?.reset();
+    requestAnimationFrame(() => this.viewport.fit());
+  }
+
+  setPlaySpeed(speed) {
+    this.playSpeed = speed;
+    this.player.setSpeed(speed);
+    this.particles.setSpeedMultiplier(speed);
+    if (this._speedSelect) this._speedSelect.value = String(speed);
+    updateScenarioPanel(this);
+  }
+
+  setActiveTrack(trackId) {
+    this.player.activeTrackId = trackId;
+    updateStepBar(this);
+    this._syncScenarioPanel();
+    const peek = this.player.activePlayer().peek();
+    if (peek && this._shouldNarrate()) {
+      this._narration?.set(peek.title || '', peek.description || '');
+    }
+    if (this.running && this.playbackMode === 'narrative') {
+      this._startNarrativeTrack();
+    }
+  }
+
+  _applyPlaybackMode(mode, { initial = false } = {}) {
+    this.playbackMode = mode;
+    PLAYBACK_MODES.forEach((m) => this.root?.classList.remove(`fg-mode-${m}`));
+    this.root?.classList.add(`fg-mode-${mode}`);
+
+    if (mode === 'play') {
+      this._stepBar?.hide();
+      this._narration?.set('', '');
+      this._applyStepHighlight(null);
+    } else if (mode === 'narrative') {
+      this._stepBar?.hide();
+      const peek = this.player.activePlayer().peek();
+      if (peek) this._narration?.set(peek.title || '', peek.description || '');
+    } else if (mode === 'step') {
+      const peek = this.player.activePlayer().peek();
+      if (peek && !this._scenarioPanel) this._narration?.set(peek.title || '', peek.description || '');
+    }
+
     syncChromePinned(this);
+    updateModeButtons(this);
+    updateStepBar(this);
+    updatePlayButton(this);
+    this._syncScenarioPanel();
+
+    if (!initial && mode !== 'step' && this.running) {
+      this._startAutoPlayback();
+    }
   }
 
-  refreshGlobalPanel() {
-    updateGlobalPanel(this);
+  _startAutoPlayback() {
+    this.player.stopAll();
+    if (this.playbackMode === 'play') {
+      this.player.startParallel();
+    } else if (this.playbackMode === 'narrative') {
+      this._startNarrativeTrack();
+    }
   }
 
-  refreshOpenPanels() {
-    refreshPanels(this);
+  _startNarrativeTrack() {
+    const p = this.player.activePlayer();
+    if (!p) return;
+    this.player.stopAll();
+    p.reset();
+    p._forceNoLoop = true;
+    p.speed = this.player.speed;
+    p.startPlay(p.track.offset || 0);
   }
 
-  _recomputeBounds() {
-    this.viewport.updateBounds(graphBoundsWithEdges(
-      this.config.nodes,
-      this.config.edges,
-      this.config.nodesById,
-      this.config.viewport.padding
-    ));
+  async stepNext() {
+    if (this.playbackMode !== 'step' || this._stepping) return null;
+    this._stepping = true;
+    updateStepBar(this);
+    updateScenarioPanel(this);
+    try {
+      return await this.player.stepNext();
+    } finally {
+      this._stepping = false;
+      updateStepBar(this);
+      updateScenarioPanel(this);
+    }
+  }
+
+  async stepPrev() {
+    if (this.playbackMode !== 'step' || this._stepping) return null;
+    this._stepping = true;
+    updateStepBar(this);
+    updateScenarioPanel(this);
+    try {
+      return await this.player.stepPrev();
+    } finally {
+      this._stepping = false;
+      updateStepBar(this);
+      updateScenarioPanel(this);
+    }
+  }
+
+  /** @deprecated use setPlaybackMode('step') */
+  enableStepMode() { this.setPlaybackMode('step'); }
+  /** @deprecated use setPlaybackMode('play') */
+  disableStepMode() { this.setPlaybackMode('play'); }
+
+  _tick(ts) {
+    if (!this._lastTs) this._lastTs = ts;
+    const dt = ts - this._lastTs;
+    this._lastTs = ts;
+    this.particles.update(dt);
+    this._raf = requestAnimationFrame((t) => this._tick(t));
+  }
+
+  start() {
+    if (this.running) return;
+    this.running = true;
+    this._lastTs = 0;
+    this.particles.setSpeedMultiplier(this.playSpeed);
+    this._raf = requestAnimationFrame((t) => this._tick(t));
+    if (this.playbackMode !== 'step') this._startAutoPlayback();
+    updatePlayButton(this);
+  }
+
+  pause() {
+    this.running = false;
+    this.player.stopAll();
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this._raf = null;
+    updatePlayButton(this);
+  }
+
+  reset() {
+    const mode = this.playbackMode;
+    this.pause();
+    this.player.reset();
+    this._applyStepHighlight(null);
+    this._atNodeId = null;
+    this.running = true;
+    this._lastTs = 0;
+    this._raf = requestAnimationFrame((t) => this._tick(t));
+    if (mode !== 'step') this._startAutoPlayback();
+    updatePlayButton(this);
+    updateModeButtons(this);
+    updateStepBar(this);
+  }
+
+  destroy() {
+    this.pause();
+    closeFullscreen(this);
+    if (this._ro) this._ro.disconnect();
+    this.container.innerHTML = '';
+    this.container.classList.remove('fg-container');
+  }
+
+  fit() {
+    this.viewport.fit();
+  }
+
+  getConfig() {
+    return this.config;
   }
 
   async applyAutoLayout(engine) {
@@ -232,171 +619,13 @@ class FlowGraphInstance {
       this.nodeRenderer.setPosition(n.id, n.x, n.y);
     });
     this.edgeRenderer.updatePaths(this.config.nodesById);
-    this._recomputeBounds();
+    this.viewport.updateBounds(graphBoundsWithEdges(
+      this.config.nodes,
+      this.config.edges,
+      this.config.nodesById,
+      this.config.viewport.padding,
+    ));
     requestAnimationFrame(() => this.viewport.fit());
-    this._emit('layout:change', { engine: eng });
-  }
-
-  _bindSimulation() {
-    const onSpawnTrack = (token, edgeId) => {
-      if (token?.id) this.sim.noteTokenSpawn(token.id, edgeId);
-    };
-
-    this.sim = new SimulationEngine(this.config, {
-      onEvent: (event, payload) => {
-        this._emit(event, payload);
-        if (event === 'token:spawn' && payload.sourceId) {
-          const src = this.config.sources.find((s) => s.id === payload.sourceId);
-          if (src) {
-            const edge = this.config.edgesById[src.edgeId];
-            if (edge?.from) {
-              this.metrics.recordEmit(edge.from, src.burst?.count || 1);
-              if (this._selectedNode === edge.from) {
-                this.refreshOpenPanels();
-              }
-            }
-          }
-        }
-        if (event === 'flow:complete') this.refreshOpenPanels();
-      },
-      spawnOnEdge: (edgeId, tokenCfg, burst, onArrive) => {
-        spawnBurst(
-          this.particles,
-          edgeId,
-          burst,
-          tokenCfg,
-          (token) => { if (onArrive) onArrive(token); },
-          (token) => onSpawnTrack(token, edgeId)
-        );
-      },
-      getNodeMetrics: (nodeId) => {
-        const s = this.metrics.nodeStats(nodeId);
-        return s ? { rejects: s.rejects, queueDepth: s.queueDepth } : {};
-      },
-      onPills: (nodeId, pills) => {
-        this.nodeRenderer.setPillsBottom(nodeId, pills);
-      },
-      onMetrics: (kind, data) => {
-        if (kind === 'arrive') this.metrics.recordArrive(data.nodeId);
-        if (kind === 'processStart') this.metrics.recordProcessStart(data.nodeId, data.waitMs);
-        if (kind === 'processEnd') this.metrics.recordProcessEnd(data.nodeId, data.processMs);
-        if (kind === 'emit') this.metrics.recordEmit(data.nodeId);
-        if (kind === 'reject') this.metrics.recordReject(data.nodeId);
-        if (kind === 'sink') this.metrics.recordSink(data.nodeId);
-        if (kind === 'flowComplete') this.metrics.recordFlowComplete(data.rtMs);
-        if (kind === 'queue') this.metrics.setQueueDepth(data.nodeId, data.depth);
-        if (data?.nodeId) this.sim._refreshPills(data.nodeId);
-        this.refreshOpenPanels();
-      },
-      onNodeProcessStart: (nodeId, effect) => {
-        this.nodeRenderer.setEffect(nodeId, effect);
-        this.nodeRenderer.setActive(nodeId, true);
-        this.metrics.setState(nodeId, 'processing');
-      },
-      onNodeProcessEnd: (nodeId) => {
-        this.nodeRenderer.setEffect(nodeId, null);
-        this.nodeRenderer.setActive(nodeId, false);
-        this.metrics.setState(nodeId, 'idle');
-      },
-      onNodeWaiting: (nodeId) => {
-        this.nodeRenderer.setEffect(nodeId, 'waiting');
-        this.metrics.setState(nodeId, 'waiting');
-      },
-      onReset: () => {
-        this.particles.clear();
-        this.metrics = new MetricsStore(this.config);
-        this.config.nodes.forEach((n) => {
-          this.nodeRenderer.setEffect(n.id, null);
-          this.nodeRenderer.setActive(n.id, false);
-          this.sim._refreshPills(n.id);
-        });
-        this.refreshGlobalPanel();
-        closeNodeDrawer(this);
-      },
-    });
-  }
-
-  _emit(event, payload) {
-    (this.listeners[event] || []).forEach((fn) => fn(payload));
-  }
-
-  on(event, fn) {
-    if (!this.listeners[event]) this.listeners[event] = [];
-    this.listeners[event].push(fn);
-    return this;
-  }
-
-  _tick(ts) {
-    if (!this._lastTs) this._lastTs = ts;
-    const dt = ts - this._lastTs;
-    this._lastTs = ts;
-    this.particles.update(dt);
-    this._raf = requestAnimationFrame((t) => this._tick(t));
-  }
-
-  start() {
-    if (this.running) return;
-    this.running = true;
-    this._lastTs = 0;
-    this.sim.start();
-    this._raf = requestAnimationFrame((t) => this._tick(t));
-    this._metricsTimer = setInterval(() => this.refreshOpenPanels(), 500);
-    updatePlayButton(this);
-  }
-
-  pause() {
-    this.running = false;
-    this.sim.pause();
-    if (this._raf) cancelAnimationFrame(this._raf);
-    this._raf = null;
-    if (this._metricsTimer) clearInterval(this._metricsTimer);
-    updatePlayButton(this);
-  }
-
-  reset() {
-    this.pause();
-    this.sim.reset();
-    updatePlayButton(this);
-  }
-
-  destroy() {
-    this.pause();
-    if (this._ro) this._ro.disconnect();
-    this.container.innerHTML = '';
-    this.container.classList.remove('fg-container');
-  }
-
-  fit() {
-    this.viewport.fit();
-  }
-
-  getConfig() {
-    return this.config;
-  }
-
-  toJSON() {
-    return {
-      title: this.config.title,
-      viewport: { ...this.config.viewport, background: this.config.viewport.background },
-      layout: this.config.layout,
-      interaction: this.config.interaction,
-      controls: this.config.controls,
-      metrics: this.config.metrics,
-      nodes: this.config.nodes.map((n) => ({
-        id: n.id, type: n.type, role: n.role, label: n.label, icon: n.icon, tone: n.tone,
-        shape: n.shape, x: n.x, y: n.y, duration: n.duration,
-        admission: n.admission, gate: n.gate, emit: n.emit, retry: n.retry, circuit: n.circuit,
-        pillTop: n.pillTop, showReceived: n.showReceived,
-      })),
-      edges: this.config.edges.map(({ id, from, to, stroke, label, weight, speed, routing, loopSide, token }) => ({
-        id, from, to, stroke, label, weight, speed, routing, loopSide, token,
-      })),
-      sources: this.config.sources,
-    };
-  }
-
-  emit(edgeId, tokenCfg) {
-    this.sim.emit(edgeId, tokenCfg);
   }
 }
 
@@ -413,7 +642,7 @@ async function createFromURL(target, url) {
 }
 
 export const FlowGraph = { create, createFromURL, parseConfig, autoLayout, needsLayout };
-export { parseConfig, SimulationEngine, graphBounds, graphBoundsWithEdges, MetricsStore };
+export { parseConfig, graphBounds, graphBoundsWithEdges, FlowPlayer, MultiTrackPlayer };
 
 if (typeof window !== 'undefined') {
   window.FlowGraph = FlowGraph;

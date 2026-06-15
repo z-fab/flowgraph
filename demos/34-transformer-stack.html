@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transformer stack — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">34 — Transformer</span></nav>
+  <div class="demo-wrap">
+    <h1>Transformer stack</h1>
+    <p class="lead">MHA fan-out 3 heads em paralelo, concat gate fan-in, duration ∝ seqLen, burst grouped no embed.</p>
+    <div class="demo-tags"><span class="demo-tag">transformers</span><span class="demo-tag ml">v2 simulated</span></div>
+    <div id="demo"></div>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/34-transformer-stack.json');
+  </script>
+</body>
+</html>

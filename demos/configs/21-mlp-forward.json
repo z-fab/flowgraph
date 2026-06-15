@@ -1,23 +1,190 @@
 {
   "title": "Forward + residual",
-  "viewport": { "height": 380, "padding": 55 },
-  "tokens": { "color": "#7C3AED", "shape": "roundedRect", "size": 6, "speed": 90 },
+  "viewport": {
+    "height": 380,
+    "padding": 55
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "shape": "roundedRect",
+    "size": 6,
+    "speed": 90
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "shape": "roundedRect",
+      "size": 6,
+      "speed": 90
+    },
+    "skip": {
+      "color": "#3D6B52",
+      "shape": "roundedRect",
+      "size": 5,
+      "speed": 95
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "input", "type": "port", "role": "source", "shape": "circle", "icon": "binary", "x": 70, "y": 190 },
-    { "id": "lin1", "type": "process", "label": "Linear", "icon": "grid-3x3", "duration": 600, "x": 200, "y": 190,
-      "pillTop": [{ "text": "W1", "tone": "primary" }] },
-    { "id": "relu", "type": "process", "shape": "circle", "icon": "activity", "duration": 300, "x": 340, "y": 190 },
-    { "id": "lin2", "type": "process", "label": "Linear", "icon": "grid-3x3", "duration": 600, "x": 480, "y": 190,
-      "pillTop": [{ "text": "W2" }] },
-    { "id": "softmax", "type": "port", "role": "terminal", "label": "Softmax", "icon": "bar-chart-2", "tone": "success", "x": 620, "y": 190 }
+    {
+      "id": "input",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "binary",
+      "x": 70,
+      "y": 190
+    },
+    {
+      "id": "lin1",
+      "type": "process",
+      "label": "Linear",
+      "icon": "grid-3x3",
+      "x": 200,
+      "y": 190,
+      "pillTop": [{ "text": "W1", "tone": "primary" }]
+    },
+    {
+      "id": "relu",
+      "type": "process",
+      "shape": "circle",
+      "icon": "activity",
+      "x": 340,
+      "y": 190
+    },
+    {
+      "id": "lin2",
+      "type": "process",
+      "label": "Linear",
+      "icon": "grid-3x3",
+      "x": 480,
+      "y": 190,
+      "pillTop": [{ "text": "W2 + skip", "tone": "primary" }]
+    },
+    {
+      "id": "softmax",
+      "type": "port",
+      "role": "terminal",
+      "label": "Softmax",
+      "icon": "bar-chart-2",
+      "tone": "success",
+      "x": 620,
+      "y": 190
+    }
   ],
   "edges": [
-    { "id": "e0", "from": "input", "to": "lin1", "label": { "text": "x" } },
-    { "id": "e1", "from": "lin1", "to": "relu", "label": { "text": "Wx+b" } },
+    {
+      "id": "e0",
+      "from": "input",
+      "to": "lin1",
+      "label": { "text": "x" }
+    },
+    {
+      "id": "e1",
+      "from": "lin1",
+      "to": "relu",
+      "label": { "text": "Wx+b" }
+    },
     { "id": "e2", "from": "relu", "to": "lin2" },
-    { "id": "e3", "from": "lin2", "to": "softmax", "label": { "text": "logits" } },
-    { "id": "skip", "from": "lin1", "to": "lin2", "routing": "loopback", "stroke": { "dash": "dash", "color": "success", "width": 1.5 },
-      "label": { "text": "skip" } }
+    {
+      "id": "e3",
+      "from": "lin2",
+      "to": "softmax",
+      "label": { "text": "logits" },
+      "stroke": { "color": "success" }
+    },
+    {
+      "id": "skip",
+      "from": "lin1",
+      "to": "lin2",
+      "routing": "loopback",
+      "loopSide": "above",
+      "stroke": { "dash": "dash", "color": "success", "width": 1.5 },
+      "label": { "text": "skip" }
+    }
   ],
-  "sources": [{ "edge": "e0", "interval": 4000 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 500,
+    "narration": { "showOnCanvas": true, "position": "top-left" },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Forward com residual",
+          "description": "A saída de Linear₁ alimenta ReLU e também pula direto para Linear₂.",
+          "ms": 700
+        }
+      },
+      {
+        "travel": {
+          "edge": "e0",
+          "token": "default",
+          "title": "Entrada x"
+        }
+      },
+      {
+        "dwell": {
+          "node": "lin1",
+          "effect": "processing",
+          "ms": 450,
+          "title": "Linear₁",
+          "description": "z = W₁x + b₁."
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "e1",
+              "token": "default",
+              "title": "Caminho principal"
+            }
+          },
+          {
+            "travel": {
+              "edge": "skip",
+              "token": "skip",
+              "title": "Conexão residual",
+              "description": "Skip connection em paralelo.",
+              "delay": 80
+            }
+          }
+        ]
+      },
+      {
+        "dwell": {
+          "node": "relu",
+          "effect": "processing",
+          "ms": 250,
+          "title": "ReLU"
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "→ Linear₂"
+        }
+      },
+      {
+        "dwell": {
+          "node": "lin2",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Linear₂",
+          "description": "Soma h_relu + skip antes de W₂."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "default",
+          "title": "Logits → Softmax"
+        }
+      },
+      { "wait": { "ms": 1000 } }
+    ]
+  }
 }

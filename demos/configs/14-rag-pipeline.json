@@ -1,20 +1,235 @@
 {
   "title": "RAG pipeline",
-  "viewport": { "height": 320, "padding": 50 },
+  "viewport": {
+    "height": 320,
+    "padding": 50
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    },
+    "context": {
+      "color": "#3D6B52",
+      "shape": "rect",
+      "size": 5
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "query", "type": "port", "role": "source", "label": "Query", "shape": "circle", "icon": "search", "x": 70, "y": 160 },
-    { "id": "embed", "type": "process", "label": "Embed", "icon": "binary", "duration": 500, "x": 200, "y": 160 },
-    { "id": "retrieve", "type": "process", "label": "Retrieve", "icon": "database", "duration": 900, "x": 340, "y": 160 },
-    { "id": "rerank", "type": "process", "label": "Rerank", "icon": "list-ordered", "duration": 600, "x": 480, "y": 160, "tone": "warning" },
-    { "id": "llm", "type": "process", "label": "LLM", "icon": "brain", "duration": 1800, "x": 620, "y": 160, "tone": "primary" },
-    { "id": "answer", "type": "port", "role": "terminal", "label": "Answer", "icon": "message-circle", "tone": "success", "x": 760, "y": 160 }
+    {
+      "id": "query",
+      "type": "port",
+      "role": "source",
+      "label": "Client",
+      "shape": "circle",
+      "icon": "search",
+      "x": 70,
+      "y": 160
+    },
+    {
+      "id": "embed",
+      "type": "process",
+      "label": "Embed",
+      "icon": "binary",
+      "x": 200,
+      "y": 160
+    },
+    {
+      "id": "retrieve",
+      "type": "process",
+      "label": "Retrieve",
+      "icon": "database",
+      "x": 340,
+      "y": 160
+    },
+    {
+      "id": "rerank",
+      "type": "process",
+      "label": "Rerank",
+      "icon": "list-ordered",
+      "x": 480,
+      "y": 160,
+      "tone": "warning"
+    },
+    {
+      "id": "llm",
+      "type": "process",
+      "label": "LLM",
+      "icon": "brain",
+      "x": 620,
+      "y": 160,
+      "tone": "primary"
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "query", "to": "embed" },
-    { "id": "e2", "from": "embed", "to": "retrieve" },
-    { "id": "e3", "from": "retrieve", "to": "rerank" },
-    { "id": "e4", "from": "rerank", "to": "llm" },
-    { "id": "e5", "from": "llm", "to": "answer", "stroke": { "color": "success" } }
+    {
+      "id": "e1",
+      "from": "query",
+      "to": "embed"
+    },
+    {
+      "id": "e2",
+      "from": "embed",
+      "to": "retrieve"
+    },
+    {
+      "id": "e3",
+      "from": "retrieve",
+      "to": "rerank"
+    },
+    {
+      "id": "e4",
+      "from": "rerank",
+      "to": "llm"
+    },
+    {
+      "id": "e5",
+      "from": "llm",
+      "to": "query",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "200 OK + citations"
+      }
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 4500 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Retrieval-Augmented Generation",
+          "description": "A pergunta do usuário é convertida em vetor, usada para buscar documentos relevantes e enriquecer o prompt do LLM.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Query → Embed",
+          "description": "Pergunta em linguagem natural: \"Qual a política de reembolso?\""
+        }
+      },
+      {
+        "dwell": {
+          "node": "embed",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Embedding",
+          "description": "Modelo sentence-transformer gera vetor d=768 para busca semântica."
+        }
+      },
+      {
+        "setPill": {
+          "node": "embed",
+          "pill": "768-d",
+          "tone": "primary",
+          "title": "Vetor pronto",
+          "description": "Embedding normalizado para similaridade cosseno."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "Embed → Retrieve",
+          "description": "Vetor consulta o índice vetorial (HNSW / FAISS)."
+        }
+      },
+      {
+        "dwell": {
+          "node": "retrieve",
+          "effect": "processing",
+          "ms": 900,
+          "title": "Retrieval",
+          "description": "Busca top-k=20 chunks mais próximos no corpus indexado."
+        }
+      },
+      {
+        "setPill": {
+          "node": "retrieve",
+          "pill": "top-20",
+          "tone": "warning",
+          "title": "Candidatos recuperados",
+          "description": "20 trechos de FAQ, contratos e artigos da base de conhecimento."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "default",
+          "title": "Retrieve → Rerank",
+          "description": "Candidatos brutos passam por reranker cross-encoder."
+        }
+      },
+      {
+        "dwell": {
+          "node": "rerank",
+          "effect": "processing",
+          "ms": 600,
+          "title": "Reranking",
+          "description": "Cross-encoder pontua relevância query×documento e seleciona top-3."
+        }
+      },
+      {
+        "setPill": {
+          "node": "rerank",
+          "pill": "top-3",
+          "tone": "success",
+          "title": "Contexto filtrado",
+          "description": "Apenas os 3 chunks mais relevantes seguem para o LLM."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e4",
+          "token": "context",
+          "title": "Rerank → LLM",
+          "description": "Prompt montado: system + contexto recuperado + pergunta do usuário."
+        }
+      },
+      {
+        "setPill": {
+          "node": "llm",
+          "pill": "grounded",
+          "tone": "primary",
+          "title": "Geração ancorada",
+          "description": "LLM instruído a responder apenas com base nos trechos fornecidos."
+        }
+      },
+      {
+        "dwell": {
+          "node": "llm",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "LLM",
+          "description": "Gera resposta citando as fontes: \"Conforme seção 4.2 da política…\""
+        }
+      },
+      {
+        "travel": {
+          "edge": "e5",
+          "token": "default",
+          "title": "LLM → Client",
+          "description": "Resposta fundamentada entregue ao usuário com referências via API."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

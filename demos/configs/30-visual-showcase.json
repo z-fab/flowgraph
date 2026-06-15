@@ -1,0 +1,169 @@
+{
+  "title": "Showcase — tour visual v2",
+  "viewport": { "height": 420, "padding": 55 },
+  "tokenTypes": {
+    "default": { "color": "#7C3AED", "speed": 90, "shape": "circle", "size": 7 },
+    "fast": { "color": "#D97706", "speed": 140, "shape": "roundedRect", "size": 6 },
+    "gradient": { "color": "#D97706", "speed": 80, "shape": "rect", "size": 5 },
+    "success": { "color": "#3D6B52", "speed": 100, "shape": "circle", "size": 7 }
+  },
+  "controls": { "step": true, "stepLog": true, "metricsDrawer": false },
+  "nodes": [
+    { "id": "src", "type": "port", "role": "source", "shape": "circle", "icon": "play", "label": "Fonte", "x": 80, "y": 200 },
+    { "id": "proc", "type": "process", "label": "Process", "icon": "cog", "shape": "roundedRect", "x": 240, "y": 120, "pillTop": [{ "text": "idle", "tone": "primary" }] },
+    { "id": "gate", "type": "process", "label": "Gate", "icon": "git-merge", "shape": "diamond", "x": 400, "y": 200, "pillTop": [{ "text": "waiting", "tone": "warning" }] },
+    { "id": "fast", "type": "process", "shape": "circle", "icon": "zap", "tone": "warning", "x": 240, "y": 280 },
+    { "id": "brk", "type": "process", "label": "Breaker", "icon": "unplug", "x": 560, "y": 120, "pillTop": [{ "text": "closed", "tone": "success" }] },
+    { "id": "out", "type": "port", "role": "terminal", "label": "Saída", "icon": "circle-check", "tone": "success", "x": 720, "y": 200 }
+  ],
+  "edges": [
+    { "id": "e1", "from": "src", "to": "proc", "routing": "bezier", "label": { "text": "forward" } },
+    { "id": "e2", "from": "src", "to": "fast", "routing": "straight", "stroke": { "dash": "dash", "color": "warning" }, "label": { "text": "fast" } },
+    { "id": "e3", "from": "proc", "to": "gate" },
+    { "id": "e4", "from": "fast", "to": "gate", "stroke": { "color": "warning" } },
+    { "id": "e5", "from": "gate", "to": "out", "stroke": { "color": "success", "width": 2 } },
+    { "id": "e6", "from": "gate", "to": "brk", "routing": "loopback", "loopSide": "above", "stroke": { "dash": "dot", "color": "primary" }, "label": { "text": "feedback" } },
+    { "id": "e7", "from": "brk", "to": "gate", "routing": "straight", "stroke": { "color": "danger", "dash": "dash" } }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": { "showOnCanvas": true, "position": "top-left", "maxWidth": 360 },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Tour FlowGraph v2",
+          "description": "Esta demo única substitui linear básico, formas, burst e primitives — todos os tipos de passo num só roteiro.",
+          "ms": 1200
+        }
+      },
+      {
+        "narrate": {
+          "title": "1 · Travel + dwell",
+          "description": "Pacote default percorre aresta bezier e processa no nó.",
+          "ms": 600
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Fonte → Process",
+          "description": "Token circular roxo — velocidade padrão."
+        }
+      },
+      {
+        "setPill": { "node": "proc", "pill": "busy", "tone": "warning" }
+      },
+      {
+        "dwell": {
+          "node": "proc",
+          "effect": "processing",
+          "ms": 450,
+          "title": "Processamento",
+          "description": "Efeito visual `processing` no nó retangular."
+        }
+      },
+      {
+        "narrate": {
+          "title": "2 · Token types + parallel",
+          "description": "Dois caminhos com tipos e velocidades diferentes convergem no gate.",
+          "ms": 700
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "e3",
+              "token": "default",
+              "title": "Caminho lento"
+            }
+          },
+          {
+            "travel": {
+              "edge": "e2",
+              "token": "fast",
+              "delay": 150,
+              "title": "Fast path",
+              "description": "Token laranja mais rápido — aresta straight tracejada."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e4",
+              "token": "fast",
+              "delay": 280,
+              "title": "Fast → Gate"
+            }
+          }
+        ]
+      },
+      {
+        "setPill": { "node": "gate", "pill": "ready", "tone": "success", "title": "Join completo" }
+      },
+      {
+        "dwell": {
+          "node": "gate",
+          "effect": "waiting",
+          "ms": 300,
+          "title": "Gate (diamond)",
+          "description": "Formato losango + pill dinâmica."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e5",
+          "token": "success",
+          "title": "Resposta",
+          "description": "Token verde até o terminal."
+        }
+      },
+      {
+        "narrate": {
+          "title": "3 · Loopback + reverse",
+          "description": "Feedback na mesma aresta com direction reverse — padrão backprop/controle.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "e6",
+          "token": "gradient",
+          "direction": "reverse",
+          "title": "Feedback reverso",
+          "description": "Gradiente retorna gate → breaker pela aresta loopback."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "brk",
+          "effect": "open",
+          "title": "Circuit open",
+          "description": "setEffect `open` + pill danger automática."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e7",
+          "token": "gradient",
+          "title": "Breaker → Gate",
+          "description": "Sinal de fallback após abertura."
+        }
+      },
+      {
+        "setEffect": { "node": "brk", "effect": "" }
+      },
+      {
+        "setPill": { "node": "brk", "pill": "closed", "tone": "success" }
+      },
+      {
+        "setPill": { "node": "proc", "pill": "idle", "tone": "primary" }
+      },
+      {
+        "setPill": { "node": "gate", "pill": "waiting", "tone": "warning" }
+      },
+      { "wait": { "ms": 1200 } }
+    ]
+  }
+}

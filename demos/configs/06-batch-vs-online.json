@@ -1,26 +1,244 @@
 {
   "title": "Batch vs online",
-  "viewport": { "height": 380, "padding": 55 },
+  "viewport": {
+    "height": 380,
+    "padding": 55
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "cron", "type": "port", "role": "source", "label": "Scheduler", "shape": "circle", "icon": "clock", "x": 80, "y": 100 },
-    { "id": "batch", "type": "process", "label": "Batch job", "icon": "layers",
-      "admission": { "mode": "batch", "max": 5, "step": 1 }, "duration": 200, "x": 260, "y": 100,
-      "pillTop": [{ "text": "batch", "tone": "primary" }] },
-    { "id": "dw", "type": "port", "role": "sink", "label": "Warehouse", "icon": "database", "tone": "success", "x": 460, "y": 100 },
-    { "id": "user", "type": "port", "role": "source", "label": "User", "shape": "circle", "icon": "user", "x": 80, "y": 260 },
-    { "id": "api", "type": "process", "label": "Online API", "icon": "zap", "duration": 400, "x": 260, "y": 260 },
-    { "id": "model", "type": "process", "label": "Model", "icon": "cpu", "duration": 900, "x": 400, "y": 260, "tone": "warning" },
-    { "id": "resp", "type": "port", "role": "terminal", "label": "Response", "icon": "send", "tone": "success", "x": 540, "y": 260 }
+    {
+      "id": "cron",
+      "type": "port",
+      "role": "source",
+      "label": "Scheduler",
+      "shape": "circle",
+      "icon": "clock",
+      "x": 80,
+      "y": 100
+    },
+    {
+      "id": "batch",
+      "type": "process",
+      "label": "Batch job",
+      "icon": "layers",
+      "x": 260,
+      "y": 100,
+      "pillTop": [
+        {
+          "text": "batch",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "dw",
+      "type": "port",
+      "role": "sink",
+      "label": "Warehouse",
+      "icon": "database",
+      "tone": "success",
+      "x": 460,
+      "y": 100
+    },
+    {
+      "id": "user",
+      "type": "port",
+      "role": "source",
+      "label": "User",
+      "shape": "circle",
+      "icon": "user",
+      "x": 80,
+      "y": 260
+    },
+    {
+      "id": "api",
+      "type": "process",
+      "label": "Online API",
+      "icon": "zap",
+      "x": 260,
+      "y": 260
+    },
+    {
+      "id": "model",
+      "type": "process",
+      "label": "Model",
+      "icon": "cpu",
+      "x": 400,
+      "y": 260,
+      "tone": "warning"
+    }
   ],
   "edges": [
-    { "id": "b1", "from": "cron", "to": "batch" },
-    { "id": "b2", "from": "batch", "to": "dw", "stroke": { "color": "primary", "dash": "dash" } },
-    { "id": "o1", "from": "user", "to": "api" },
-    { "id": "o2", "from": "api", "to": "model" },
-    { "id": "o3", "from": "model", "to": "resp", "stroke": { "color": "success" } }
+    {
+      "id": "b1",
+      "from": "cron",
+      "to": "batch"
+    },
+    {
+      "id": "b2",
+      "from": "batch",
+      "to": "dw",
+      "stroke": {
+        "color": "primary",
+        "dash": "dash"
+      }
+    },
+    {
+      "id": "o1",
+      "from": "user",
+      "to": "api"
+    },
+    {
+      "id": "o2",
+      "from": "api",
+      "to": "model"
+    },
+    {
+      "id": "o3",
+      "from": "model",
+      "to": "api",
+      "routing": "loopback",
+      "loopSide": "above",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "score"
+      }
+    },
+    {
+      "id": "o4",
+      "from": "api",
+      "to": "user",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "200 OK"
+      }
+    }
   ],
-  "sources": [
-    { "edge": "b1", "interval": 4000, "token": { "color": "#5B21B6" } },
-    { "edge": "o1", "interval": 2200, "jitter": 300 }
-  ]
+  "scenario": {
+    "loop": true,
+    "playInterval": 580,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Dois modos de inferência",
+          "description": "Batch processa milhões de linhas de madrugada; online responde uma requisição em milissegundos.",
+          "ms": 900
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "b1",
+              "token": "default",
+              "title": "Cron dispara job",
+              "description": "Scheduler aciona pipeline noturno às 02:00."
+            }
+          },
+          {
+            "travel": {
+              "edge": "o1",
+              "token": "default",
+              "delay": 200,
+              "title": "Requisição online",
+              "description": "Usuário chama a API em horário de pico."
+            }
+          }
+        ]
+      },
+      {
+        "parallel": [
+          {
+            "dwell": {
+              "node": "batch",
+              "effect": "processing",
+              "ms": 200,
+              "title": "Batch job",
+              "description": "Spark lê 12M registros e aplica modelo em partição."
+            }
+          },
+          {
+            "dwell": {
+              "node": "api",
+              "effect": "processing",
+              "ms": 400,
+              "delay": 200,
+              "title": "Online API",
+              "description": "API valida payload e encaminha para inferência síncrona."
+            }
+          }
+        ]
+      },
+      {
+        "travel": {
+          "edge": "b2",
+          "token": "default",
+          "title": "Scores em massa",
+          "description": "Milhões de predições gravadas no data warehouse para BI."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Contraste de latência",
+          "description": "Batch: throughput alto, latência de horas. Online: uma predição, resposta em <200ms.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "o2",
+          "token": "default",
+          "title": "Inferência unitária",
+          "description": "Modelo ONNX processa um único vetor de features."
+        }
+      },
+      {
+        "dwell": {
+          "node": "model",
+          "effect": "processing",
+          "ms": 900,
+          "title": "Model",
+          "description": "Forward pass no GPU — latência p99 de 45ms."
+        }
+      },
+      {
+        "travel": {
+          "edge": "o3",
+          "token": "default",
+          "title": "Score → API",
+          "description": "Modelo devolve predição ao handler HTTP."
+        }
+      },
+      {
+        "travel": {
+          "edge": "o4",
+          "token": "default",
+          "title": "Resposta imediata",
+          "description": "200 OK retornado ao cliente na mesma requisição HTTP."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

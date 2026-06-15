@@ -5,8 +5,15 @@ import { parseConfig } from '../src/config.js';
 import { autoLayout } from '../src/layout.js';
 
 describe('dagreLayout', () => {
+  const MIN_SCENARIO = {
+    scenario: {
+      steps: [{ travel: { edge: 'ab' } }],
+    },
+  };
+
   it('assigns coordinates to all nodes', () => {
     const cfg = parseConfig({
+      ...MIN_SCENARIO,
       nodes: [
         { id: 'a', type: 'port', role: 'source' },
         { id: 'b', type: 'process', label: 'B' },

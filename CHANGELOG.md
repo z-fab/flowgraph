@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-06-14
+
+### Changed (breaking)
+
+- **Pivot to visual scenario model** — simulation engine, metrics store, admission, gates, and emit blocks removed.
+- Config now requires `scenario.steps` (or `scenario.tracks`) with explicit `travel`, `dwell`, `parallel`, `setPill`, `setEffect`, `narrate`, etc.
+- **Reverse travel** — `direction: "reverse"` animates tokens backward along the same edge (backprop, feedback).
+- **Playback modes** — `play` (continuous), `narrative` (overlay + track picker), `step` (floating panel with script + nav).
+
+### Added
+
+- `FlowPlayer` scenario executor ([`src/flow-player.js`](src/flow-player.js))
+- **Orthogonal edge routing** (`routing: "orthogonal"`) with lane separation for parallel edges
+- **Floating scenario panel** (step mode): draggable script list, track select, Voltar/Próximo
+- **Narration overlay** (narrative mode): title + description in corner + track select
+- `countMetrics: false` on tokens/steps to skip queue/counter pills (e.g. read-only SELECT)
+- Processing pill (`running`) during `dwell` with `effect: "processing"`
+- [`docs/SCENARIO.md`](docs/SCENARIO.md) and [`schema/flowgraph-v2.json`](schema/flowgraph-v2.json)
+- 40 demos migrated to scenario format; demo 29 async job polling as reference architecture
+
+### Removed
+
+- `SimulationEngine`, `MetricsStore`, `sources[]`, admission/gate/emit simulation blocks, metric drawers
+
 ## [1.0.0] - 2026-06-14
 
 ### Added

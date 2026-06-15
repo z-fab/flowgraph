@@ -1,18 +1,191 @@
 {
   "title": "SSE stream",
-  "viewport": { "height": 320, "padding": 50 },
+  "viewport": {
+    "height": 320,
+    "padding": 50
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    },
+    "edge": {
+      "shape": "rect",
+      "color": "#3D6B52",
+      "size": 5
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "client", "type": "port", "role": "source", "label": "Client", "shape": "circle", "icon": "monitor", "x": 90, "y": 160 },
-    { "id": "api", "type": "process", "label": "Stream API", "icon": "radio", "duration": 500, "x": 270, "y": 160 },
-    { "id": "llm", "type": "process", "label": "LLM", "icon": "brain", "duration": 800, "x": 430, "y": 160, "tone": "primary",
-      "emit": { "mode": "all", "count": 4 } },
-    { "id": "out", "type": "port", "role": "sink", "label": "Browser", "icon": "message-square", "tone": "success", "x": 590, "y": 160, "showReceived": true }
+    {
+      "id": "client",
+      "type": "port",
+      "role": "source",
+      "label": "Client",
+      "shape": "circle",
+      "icon": "monitor",
+      "x": 90,
+      "y": 160
+    },
+    {
+      "id": "api",
+      "type": "process",
+      "label": "Stream API",
+      "icon": "radio",
+      "x": 270,
+      "y": 160
+    },
+    {
+      "id": "llm",
+      "type": "process",
+      "label": "LLM",
+      "icon": "brain",
+      "x": 430,
+      "y": 160,
+      "tone": "primary"
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "client", "to": "api" },
-    { "id": "e2", "from": "api", "to": "llm", "animated": true },
-    { "id": "e3", "from": "llm", "to": "out", "stroke": { "color": "success" }, "animated": true,
-      "token": { "shape": "rect", "color": "#3D6B52", "size": 5 } }
+    {
+      "id": "e1",
+      "from": "client",
+      "to": "api"
+    },
+    {
+      "id": "e2",
+      "from": "api",
+      "to": "llm",
+      "animated": true
+    },
+    {
+      "id": "e3",
+      "from": "llm",
+      "to": "client",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "animated": true,
+      "token": {
+        "shape": "rect",
+        "color": "#3D6B52",
+        "size": 5
+      },
+      "label": {
+        "text": "SSE chunks"
+      }
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 4500 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 500,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Streaming SSE",
+          "description": "O cliente abre uma conexão Server-Sent Events e recebe tokens do LLM conforme são gerados.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "GET /stream",
+          "description": "Browser abre conexão SSE com Accept: text/event-stream."
+        }
+      },
+      {
+        "dwell": {
+          "node": "api",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Stream API",
+          "description": "API mantém conexão aberta e encaminha prompt ao LLM."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "Prompt → LLM",
+          "description": "Requisição de completion com streaming habilitado."
+        }
+      },
+      {
+        "dwell": {
+          "node": "llm",
+          "effect": "processing",
+          "ms": 800,
+          "title": "LLM",
+          "description": "Modelo gera tokens autoregressivamente — ~40 tok/s."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Tokens em fluxo",
+          "description": "Cada retângulo verde é um chunk SSE (data: {\"token\": \"...\"}) enviado ao browser.",
+          "ms": 700
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "e3",
+              "token": "edge",
+              "title": "token: \"O\"",
+              "description": "Primeiro token da resposta."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e3",
+              "token": "edge",
+              "delay": 100,
+              "title": "token: \" churn\"",
+              "description": "Segundo chunk SSE."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e3",
+              "token": "edge",
+              "delay": 200,
+              "title": "token: \" é\"",
+              "description": "Terceiro chunk SSE."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e3",
+              "token": "edge",
+              "delay": 300,
+              "title": "token: \"...\"",
+              "description": "Stream continua até [DONE]."
+            }
+          }
+        ]
+      },
+      {
+        "setEffect": {
+          "node": "client",
+          "effect": "open",
+          "title": "Stream completo",
+          "description": "Browser renderiza a resposta token a token na mesma conexão SSE."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1000
+        }
+      }
+    ]
+  }
 }

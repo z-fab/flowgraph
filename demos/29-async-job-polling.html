@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Async job polling — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">29 — Async job polling</span></nav>
+  <div class="demo-wrap">
+    <h1>Submit + polling</h1>
+    <p class="lead">POST /predict persiste o job no PostgreSQL, publica na fila RabbitMQ e responde 202 + jobId pelo mesmo servidor HTTP. O worker consome da fila, processa e atualiza o banco. O cliente faz polling em GET /status até receber 200 com o resultado.</p>
+    <div class="demo-tags"><span class="demo-tag ml">async jobs</span><span class="demo-tag ml">v2 simulated</span></div>
+    <div id="demo"></div>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/29-async-job-polling.json');
+  </script>
+</body>
+</html>

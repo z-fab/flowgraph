@@ -1,19 +1,352 @@
 {
   "title": "ReAct loop",
-  "viewport": { "height": 400, "padding": 55 },
+  "viewport": {
+    "height": 420,
+    "padding": 55
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "user", "type": "port", "role": "source", "label": "User", "shape": "circle", "icon": "user", "x": 80, "y": 200 },
-    { "id": "orch", "type": "process", "label": "Orchestrator", "icon": "bot", "duration": 600, "x": 230, "y": 200 },
-    { "id": "llm", "type": "process", "label": "LLM", "icon": "brain", "duration": 1500, "x": 400, "y": 120, "tone": "primary" },
-    { "id": "tool", "type": "process", "label": "Tool", "icon": "wrench", "duration": 900, "x": 400, "y": 280, "tone": "warning" },
-    { "id": "stream", "type": "port", "role": "terminal", "label": "Stream out", "icon": "radio", "tone": "success", "x": 580, "y": 200 }
+    {
+      "id": "user",
+      "type": "port",
+      "role": "source",
+      "label": "User",
+      "shape": "circle",
+      "icon": "user",
+      "x": 70,
+      "y": 200
+    },
+    {
+      "id": "orch",
+      "type": "process",
+      "label": "Orchestrator",
+      "icon": "bot",
+      "x": 210,
+      "y": 200,
+      "pillTop": [
+        {
+          "text": "route",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "process",
+      "label": "LLM",
+      "icon": "brain",
+      "x": 400,
+      "y": 110,
+      "tone": "primary",
+      "pillTop": [
+        {
+          "text": "think",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "tool",
+      "type": "process",
+      "label": "Tool",
+      "icon": "wrench",
+      "x": 400,
+      "y": 290,
+      "tone": "warning",
+      "pillTop": [
+        {
+          "text": "act",
+          "tone": "warning"
+        }
+      ]
+    }
   ],
   "edges": [
-    { "id": "u", "from": "user", "to": "orch" },
-    { "id": "ol", "from": "orch", "to": "llm", "label": { "text": "think" } },
-    { "id": "ot", "from": "orch", "to": "tool", "label": { "text": "act" }, "stroke": { "dash": "dash", "color": "warning" } },
-    { "id": "tl", "from": "tool", "to": "llm", "routing": "loopback", "stroke": { "color": "warning", "dash": "dash" } },
-    { "id": "ls", "from": "llm", "to": "stream", "stroke": { "color": "success" } }
+    {
+      "id": "u",
+      "from": "user",
+      "to": "orch"
+    },
+    {
+      "id": "ol",
+      "from": "orch",
+      "to": "llm",
+      "label": {
+        "text": "think"
+      }
+    },
+    {
+      "id": "ot",
+      "from": "orch",
+      "to": "tool",
+      "label": {
+        "text": "act"
+      },
+      "stroke": {
+        "dash": "dash",
+        "color": "warning"
+      }
+    },
+    {
+      "id": "tl",
+      "from": "tool",
+      "to": "llm",
+      "routing": "loopback",
+      "stroke": {
+        "color": "warning",
+        "dash": "dash"
+      },
+      "label": {
+        "text": "observation"
+      }
+    },
+    {
+      "id": "lo",
+      "from": "llm",
+      "to": "orch",
+      "routing": "loopback",
+      "loopSide": "above",
+      "label": {
+        "text": "turn+1"
+      },
+      "stroke": {
+        "color": "primary",
+        "dash": "dot"
+      }
+    },
+    {
+      "id": "ou",
+      "from": "orch",
+      "to": "user",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "SSE answer"
+      }
+    }
   ],
-  "sources": [{ "edge": "u", "interval": 5500 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Ciclo ReAct",
+          "description": "O agente alterna raciocínio (Think), ação em ferramenta (Act) e observação do resultado (Observe) até formular a resposta.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "u",
+          "token": "default",
+          "title": "Pergunta do usuário",
+          "description": "O orchestrator recebe a consulta e inicia o loop ReAct."
+        }
+      },
+      {
+        "dwell": {
+          "node": "orch",
+          "effect": "processing",
+          "ms": 400,
+          "title": "Orchestrator",
+          "description": "Analisa a intenção e decide encaminhar para raciocínio."
+        }
+      },
+      {
+        "setPill": {
+          "node": "orch",
+          "pill": "think",
+          "tone": "primary",
+          "title": "Modo Think",
+          "description": "Próximo passo: o LLM raciocina sobre a pergunta."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ol",
+          "token": "default",
+          "title": "Think → LLM",
+          "description": "Prompt com contexto e instruções de raciocínio."
+        }
+      },
+      {
+        "dwell": {
+          "node": "llm",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "LLM — raciocínio",
+          "description": "Gera chain-of-thought: identifica que precisa consultar uma ferramenta externa."
+        }
+      },
+      {
+        "setPill": {
+          "node": "llm",
+          "pill": "plan",
+          "tone": "primary",
+          "title": "Plano de ação",
+          "description": "O modelo decide chamar search_web(query=…)."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lo",
+          "token": "default",
+          "title": "Turno +1 → Orchestrator",
+          "description": "Resposta parcial retorna ao orchestrator para despacho."
+        }
+      },
+      {
+        "dwell": {
+          "node": "orch",
+          "effect": "processing",
+          "ms": 400,
+          "title": "Orchestrator",
+          "description": "Interpreta o plano e roteia para a ferramenta correta."
+        }
+      },
+      {
+        "setPill": {
+          "node": "orch",
+          "pill": "act",
+          "tone": "warning",
+          "title": "Modo Act",
+          "description": "Encaminha a chamada de ferramenta."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ot",
+          "token": "default",
+          "title": "Act → Tool",
+          "description": "Executa search_web com os argumentos do LLM."
+        }
+      },
+      {
+        "setPill": {
+          "node": "tool",
+          "pill": "running",
+          "tone": "warning",
+          "title": "Ferramenta em execução",
+          "description": "API externa processa a consulta."
+        }
+      },
+      {
+        "dwell": {
+          "node": "tool",
+          "effect": "processing",
+          "ms": 900,
+          "title": "Tool",
+          "description": "Retorna snippets e metadados da busca."
+        }
+      },
+      {
+        "setPill": {
+          "node": "tool",
+          "pill": "done",
+          "tone": "success",
+          "title": "Observação pronta",
+          "description": "Resultado serializado como observation para o LLM."
+        }
+      },
+      {
+        "travel": {
+          "edge": "tl",
+          "token": "default",
+          "title": "Observation → LLM",
+          "description": "O resultado da ferramenta alimenta o próximo turno de raciocínio."
+        }
+      },
+      {
+        "setPill": {
+          "node": "llm",
+          "pill": "observe",
+          "tone": "warning",
+          "title": "Modo Observe",
+          "description": "O LLM incorpora os fatos recuperados ao contexto."
+        }
+      },
+      {
+        "dwell": {
+          "node": "llm",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "LLM — síntese",
+          "description": "Cruza a observação com a pergunta original e formula a resposta final."
+        }
+      },
+      {
+        "setPill": {
+          "node": "llm",
+          "pill": "answer",
+          "tone": "success",
+          "title": "Resposta final",
+          "description": "Tokens de conclusão prontos para streaming."
+        }
+      },
+      {
+        "setPill": {
+          "node": "orch",
+          "pill": "respond",
+          "tone": "success",
+          "title": "Encerrar ciclo",
+          "description": "Orchestrator libera a resposta ao cliente."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ou",
+          "token": "default",
+          "title": "Orchestrator → User",
+          "description": "Resposta final transmitida token a token via SSE ao cliente."
+        }
+      },
+      {
+        "setPill": {
+          "node": "orch",
+          "pill": "route",
+          "tone": "primary",
+          "title": "Reset do ciclo",
+          "description": "Pills voltam ao estado inicial para o próximo loop."
+        }
+      },
+      {
+        "setPill": {
+          "node": "llm",
+          "pill": "think",
+          "tone": "primary",
+          "title": "Reset LLM",
+          "description": "Pronto para nova pergunta."
+        }
+      },
+      {
+        "setPill": {
+          "node": "tool",
+          "pill": "act",
+          "tone": "warning",
+          "title": "Reset Tool",
+          "description": "Ferramenta ociosa aguardando próxima chamada."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

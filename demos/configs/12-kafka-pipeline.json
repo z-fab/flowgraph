@@ -1,25 +1,278 @@
 {
   "title": "events.topic",
-  "viewport": { "height": 400, "padding": 50 },
+  "viewport": {
+    "height": 440,
+    "padding": 50
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "prod", "type": "port", "role": "source", "shape": "circle", "icon": "send", "x": 90, "y": 200 },
-    { "id": "kafka", "type": "process", "label": "Kafka", "icon": "layers", "duration": 300, "emit": { "mode": "all" },
-      "pillTop": [{ "text": "events" }], "x": 260, "y": 200 },
-    { "id": "c1", "type": "process", "label": "Consumer A", "icon": "eye", "duration": 800, "x": 460, "y": 90 },
-    { "id": "c2", "type": "process", "label": "Consumer B", "icon": "eye", "duration": 600, "x": 460, "y": 200 },
-    { "id": "c3", "type": "process", "label": "Consumer C", "icon": "eye", "duration": 1000, "x": 460, "y": 310 },
-    { "id": "s1", "type": "port", "role": "sink", "label": "ClickHouse", "icon": "database", "tone": "success", "x": 640, "y": 90 },
-    { "id": "s2", "type": "port", "role": "sink", "label": "Alerts", "icon": "bell", "tone": "warning", "x": 640, "y": 200 },
-    { "id": "s3", "type": "port", "role": "sink", "label": "S3 archive", "icon": "archive", "tone": "success", "x": 640, "y": 310 }
+    {
+      "id": "prod",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "send",
+      "x": 70,
+      "y": 200
+    },
+    {
+      "id": "part",
+      "type": "process",
+      "label": "Partitioner",
+      "icon": "hash",
+      "x": 180,
+      "y": 200,
+      "pillTop": [
+        {
+          "text": "key→part",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "kafka",
+      "type": "process",
+      "label": "Kafka topic",
+      "icon": "layers",
+      "x": 330,
+      "y": 200,
+      "pillTop": [
+        {
+          "text": "events",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "c1",
+      "type": "process",
+      "label": "Consumer A",
+      "icon": "eye",
+      "x": 520,
+      "y": 80,
+      "pillTop": [
+        {
+          "text": "part.0",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "c2",
+      "type": "process",
+      "label": "Consumer B",
+      "icon": "eye",
+      "x": 520,
+      "y": 200
+    },
+    {
+      "id": "c3",
+      "type": "process",
+      "label": "Consumer C",
+      "icon": "eye",
+      "x": 520,
+      "y": 320,
+      "pillTop": [
+        {
+          "text": "part.2 · lag",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "s1",
+      "type": "port",
+      "role": "sink",
+      "label": "ClickHouse",
+      "icon": "database",
+      "tone": "success",
+      "x": 700,
+      "y": 80
+    },
+    {
+      "id": "s2",
+      "type": "port",
+      "role": "sink",
+      "label": "Alerts",
+      "icon": "bell",
+      "tone": "warning",
+      "x": 700,
+      "y": 200
+    },
+    {
+      "id": "s3",
+      "type": "port",
+      "role": "sink",
+      "label": "S3 archive",
+      "icon": "archive",
+      "tone": "success",
+      "x": 700,
+      "y": 320
+    }
   ],
   "edges": [
-    { "id": "pk", "from": "prod", "to": "kafka" },
-    { "id": "kc1", "from": "kafka", "to": "c1", "label": { "text": "part.0" } },
-    { "id": "kc2", "from": "kafka", "to": "c2" },
-    { "id": "kc3", "from": "kafka", "to": "c3", "label": { "text": "part.2" } },
-    { "id": "cs1", "from": "c1", "to": "s1", "stroke": { "color": "success" } },
-    { "id": "cs2", "from": "c2", "to": "s2", "stroke": { "color": "warning" } },
-    { "id": "cs3", "from": "c3", "to": "s3", "stroke": { "color": "success" } }
+    {
+      "id": "pk",
+      "from": "prod",
+      "to": "part"
+    },
+    {
+      "id": "pk2",
+      "from": "part",
+      "to": "kafka"
+    },
+    {
+      "id": "kc1",
+      "from": "kafka",
+      "to": "c1",
+      "label": {
+        "text": "part.0"
+      }
+    },
+    {
+      "id": "kc2",
+      "from": "kafka",
+      "to": "c2",
+      "label": {
+        "text": "part.1"
+      }
+    },
+    {
+      "id": "kc3",
+      "from": "kafka",
+      "to": "c3",
+      "label": {
+        "text": "part.2"
+      }
+    },
+    {
+      "id": "cs1",
+      "from": "c1",
+      "to": "s1",
+      "stroke": {
+        "color": "success"
+      }
+    },
+    {
+      "id": "cs2",
+      "from": "c2",
+      "to": "s2",
+      "stroke": {
+        "color": "warning"
+      }
+    },
+    {
+      "id": "cs3",
+      "from": "c3",
+      "to": "s3",
+      "stroke": {
+        "color": "success"
+      }
+    }
   ],
-  "sources": [{ "edge": "pk", "interval": 2200, "burst": { "count": 2, "spacing": 55 }, "token": { "color": "#5B21B6", "size": 5 } }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Pipeline Kafka",
+          "description": "Eventos são particionados por chave; cada partição é consumida por um membro do consumer group.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "pk",
+          "token": "default",
+          "title": "Produce event",
+          "description": "Produtor publica evento click_purchase com chave user_id=4821."
+        }
+      },
+      {
+        "dwell": {
+          "node": "part",
+          "effect": "processing",
+          "ms": 80,
+          "title": "Partitioner",
+          "description": "hash(user_id) % 3 → partição 2."
+        }
+      },
+      {
+        "travel": {
+          "edge": "pk2",
+          "token": "default",
+          "title": "Append ao topic",
+          "description": "Evento gravado no offset 1.847.293 do topic events."
+        }
+      },
+      {
+        "dwell": {
+          "node": "kafka",
+          "effect": "processing",
+          "ms": 200,
+          "title": "Kafka topic",
+          "description": "3 partições replicadas (RF=3) — evento disponível para consumo."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Fan-out para consumer group",
+          "description": "O evento vai apenas à partição 2 — Consumer C do grupo analytics processa e persiste.",
+          "ms": 700
+        }
+      },
+      {
+        "travel": {
+          "edge": "kc3",
+          "token": "default",
+          "title": "part.2 → Consumer C",
+          "description": "hash(user_id) % 3 = 2 — apenas esta partição recebe o evento."
+        }
+      },
+      {
+        "dwell": {
+          "node": "c3",
+          "effect": "waiting",
+          "ms": 1200,
+          "title": "Consumer C · lag",
+          "description": "Backpressure — lag de 4.200 msgs na part.2."
+        }
+      },
+      {
+        "setPill": {
+          "node": "c3",
+          "pill": "lag 4.2k",
+          "tone": "warning",
+          "title": "Consumer lag",
+          "description": "Métrica consumer_lag > threshold — alerta no Grafana."
+        }
+      },
+      {
+        "travel": {
+          "edge": "cs3",
+          "token": "default",
+          "title": "→ S3 archive",
+          "description": "Consumer C persiste após catch-up parcial."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1100
+        }
+      }
+    ]
+  }
 }

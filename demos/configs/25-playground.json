@@ -3,21 +3,160 @@
   "viewport": {
     "height": 420,
     "padding": 55,
-    "background": { "color": "#FAFAF8", "pattern": "dots", "patternSize": 18 }
+    "background": {
+      "color": "#FAFAF8",
+      "pattern": "dots",
+      "patternSize": 18
+    }
   },
-  "controls": { "layout": true },
-  "layout": { "engine": "dagre", "direction": "LR" },
-  "interaction": { "nodeDrag": true },
-  "metrics": { "charts": true, "globalDrawer": true, "nodeDrawer": true },
-  "tokens": { "color": "#7C3AED", "speed": 100, "size": 6 },
+  "layout": {
+    "engine": "dagre",
+    "direction": "LR"
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "speed": 100,
+    "size": 6
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "speed": 100,
+      "size": 6
+    }
+  },
+  "controls": {
+    "layout": true,
+    "metricsDrawer": false
+  },
+  "interaction": {
+    "nodeDrag": true
+  },
   "nodes": [
-    { "id": "src", "type": "port", "role": "source", "shape": "circle", "icon": "inbox", "x": 80, "y": 200 },
-    { "id": "proc", "type": "process", "label": "Process", "icon": "cpu", "duration": 1200, "x": 260, "y": 200 },
-    { "id": "sink", "type": "port", "role": "sink", "label": "Out", "icon": "check", "tone": "success", "showReceived": true, "x": 440, "y": 200 }
+    {
+      "id": "src",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "inbox",
+      "x": 80,
+      "y": 200
+    },
+    {
+      "id": "proc",
+      "type": "process",
+      "label": "Process",
+      "icon": "cpu",
+      "x": 260,
+      "y": 200
+    },
+    {
+      "id": "sink",
+      "type": "port",
+      "role": "sink",
+      "label": "Out",
+      "icon": "check",
+      "tone": "success",
+      "x": 440,
+      "y": 200
+    }
   ],
   "edges": [
-    { "id": "in", "from": "src", "to": "proc" },
-    { "id": "out", "from": "proc", "to": "sink", "stroke": { "color": "success" } }
+    {
+      "id": "in",
+      "from": "src",
+      "to": "proc"
+    },
+    {
+      "id": "out",
+      "from": "proc",
+      "to": "sink",
+      "stroke": {
+        "color": "success"
+      }
+    }
   ],
-  "sources": [{ "edge": "in", "interval": 1400, "burst": { "count": 1, "spacing": 0 } }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Bem-vindo ao Playground",
+          "description": "Este é o ambiente de autoria do FlowGraph v2 — edite o JSON, arraste nós e explore os controles.",
+          "ms": 1100
+        }
+      },
+      {
+        "narrate": {
+          "title": "Arrastar nós",
+          "description": "Clique e arraste qualquer nó para reposicionar. O grafo mantém as arestas conectadas.",
+          "ms": 900
+        }
+      },
+      {
+        "focus": {
+          "node": "proc",
+          "title": "Nó Process",
+          "description": "Retângulos representam processamento; círculos são portas de entrada/saída."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Controles da toolbar",
+          "description": "▶ Play/Pause inicia o roteiro. ↺ Reset volta ao início. ⊞ Layout reorganiza com dagre.",
+          "ms": 1000
+        }
+      },
+      {
+        "narrate": {
+          "title": "Modo passo a passo",
+          "description": "Use Step → para avançar um passo do scenario por vez — ideal para apresentações.",
+          "ms": 850
+        }
+      },
+      {
+        "travel": {
+          "edge": "in",
+          "token": "default",
+          "title": "Entrada → Process",
+          "description": "Pacote percorre a aresta `in` — observe o overlay de narração."
+        }
+      },
+      {
+        "dwell": {
+          "node": "proc",
+          "effect": "processing",
+          "ms": 900,
+          "title": "Processamento",
+          "description": "Efeito visual `processing` indica trabalho no nó."
+        }
+      },
+      {
+        "travel": {
+          "edge": "out",
+          "token": "default",
+          "title": "Process → Out",
+          "description": "Aresta verde até o sink de saída."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Próximos passos",
+          "description": "Duplique este config, adicione nós/arestas e escreva seu próprio scenario com travel, dwell e parallel.",
+          "ms": 1000
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

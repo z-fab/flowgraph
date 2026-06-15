@@ -3,23 +3,225 @@
   "viewport": {
     "height": 360,
     "padding": 50,
-    "background": { "color": "#FAFAF8", "pattern": "grid", "patternSize": 20 }
+    "background": {
+      "color": "#FAFAF8",
+      "pattern": "grid",
+      "patternSize": 20
+    }
   },
-  "controls": { "layout": true },
-  "interaction": { "nodeDrag": true },
-  "tokens": { "color": "#7C3AED", "speed": 100 },
+  "tokens": {
+    "color": "#7C3AED",
+    "speed": 100
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "speed": 100
+    }
+  },
+  "controls": {
+    "layout": true,
+    "metricsDrawer": false
+  },
+  "interaction": {
+    "nodeDrag": true
+  },
   "nodes": [
-    { "id": "client", "type": "port", "role": "source", "label": "Client", "icon": "user", "x": 90, "y": 180 },
-    { "id": "breaker", "type": "process", "label": "Circuit Breaker", "icon": "unplug", "duration": 400,
-      "circuit": { "acceptEdge": "ok", "fallbackEdge": "fb", "failureRate": 0.35, "failureThreshold": 4, "recoveryMs": 6000 },
-      "pillTop": [{ "text": "closed", "tone": "success" }], "x": 270, "y": 180 },
-    { "id": "service", "type": "process", "label": "Downstream", "icon": "server", "tone": "success", "duration": 600, "x": 470, "y": 100 },
-    { "id": "fallback", "type": "process", "label": "Fallback cache", "icon": "archive", "tone": "warning", "duration": 300, "x": 470, "y": 260 }
+    {
+      "id": "client",
+      "type": "port",
+      "role": "source",
+      "label": "Client",
+      "icon": "user",
+      "x": 90,
+      "y": 180
+    },
+    {
+      "id": "breaker",
+      "type": "process",
+      "label": "Circuit Breaker",
+      "icon": "unplug",
+      "pillTop": [{ "text": "closed", "tone": "success" }],
+      "x": 270,
+      "y": 180
+    },
+    {
+      "id": "service",
+      "type": "process",
+      "label": "Downstream",
+      "icon": "server",
+      "tone": "success",
+      "x": 470,
+      "y": 100
+    },
+    {
+      "id": "fallback",
+      "type": "process",
+      "label": "Fallback cache",
+      "icon": "archive",
+      "tone": "warning",
+      "x": 470,
+      "y": 260
+    }
   ],
   "edges": [
     { "id": "c1", "from": "client", "to": "breaker" },
-    { "id": "ok", "from": "breaker", "to": "service", "label": { "text": "closed" }, "stroke": { "color": "success" } },
-    { "id": "fb", "from": "breaker", "to": "fallback", "label": { "text": "open" }, "stroke": { "dash": "dash", "color": "warning" } }
+    {
+      "id": "ok",
+      "from": "breaker",
+      "to": "service",
+      "label": { "text": "closed" },
+      "stroke": { "color": "success" }
+    },
+    {
+      "id": "fb",
+      "from": "breaker",
+      "to": "fallback",
+      "label": { "text": "open" },
+      "stroke": { "dash": "dash", "color": "warning" }
+    },
+    {
+      "id": "ok-back",
+      "from": "service",
+      "to": "client",
+      "routing": "bezier",
+      "stroke": { "color": "success" },
+      "label": { "text": "200 OK" }
+    },
+    {
+      "id": "fb-back",
+      "from": "fallback",
+      "to": "client",
+      "routing": "bezier",
+      "stroke": { "color": "warning" },
+      "label": { "text": "200 cached" }
+    }
   ],
-  "sources": [{ "edge": "c1", "interval": 1800 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": { "showOnCanvas": true, "position": "top-left" },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Circuito fechado",
+          "description": "Requisições normais passam pelo downstream enquanto o serviço responde.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "c1",
+          "token": "default",
+          "title": "Client → Breaker"
+        }
+      },
+      {
+        "dwell": {
+          "node": "breaker",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Circuit Breaker",
+          "description": "Estado: closed — encaminha para o serviço."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ok",
+          "token": "default",
+          "title": "Breaker → Downstream",
+          "description": "Caminho feliz via aresta closed."
+        }
+      },
+      {
+        "dwell": {
+          "node": "service",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Downstream",
+          "description": "Serviço processa e responde 200."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ok-back",
+          "token": "default",
+          "title": "200 OK → Client",
+          "description": "Resposta do downstream retorna ao cliente."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Falhas acumuladas",
+          "description": "Timeouts e 5xx disparam a abertura do circuito — requisições vão ao fallback.",
+          "ms": 900
+        }
+      },
+      {
+        "setEffect": {
+          "node": "breaker",
+          "effect": "open",
+          "title": "Circuito aberto",
+          "description": "Breaker deixa de chamar o downstream."
+        }
+      },
+      {
+        "travel": {
+          "edge": "c1",
+          "token": "default",
+          "title": "Nova requisição"
+        }
+      },
+      {
+        "dwell": {
+          "node": "breaker",
+          "effect": "waiting",
+          "ms": 400,
+          "title": "Breaker (open)",
+          "description": "Fail-fast — não espera timeout do downstream."
+        }
+      },
+      {
+        "travel": {
+          "edge": "fb",
+          "token": "default",
+          "title": "Breaker → Fallback",
+          "description": "Resposta degradada via cache local."
+        }
+      },
+      {
+        "dwell": {
+          "node": "fallback",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Fallback cache",
+          "description": "Retorna dados em cache (stale-ok)."
+        }
+      },
+      {
+        "travel": {
+          "edge": "fb-back",
+          "token": "default",
+          "title": "200 cached → Client",
+          "description": "Resposta degradada entregue ao cliente sem chamar o downstream."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "breaker",
+          "effect": ""
+        }
+      },
+      {
+        "setPill": {
+          "node": "breaker",
+          "pill": "closed",
+          "tone": "success",
+          "title": "Half-open / reset",
+          "description": "Após cooldown, o circuito volta a closed para o próximo ciclo."
+        }
+      },
+      { "wait": { "ms": 1000 } }
+    ]
+  }
 }

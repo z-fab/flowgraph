@@ -1,19 +1,237 @@
 {
   "title": "Closed-loop",
-  "viewport": { "height": 360, "padding": 60 },
-  "tokens": { "color": "#3D6B52", "speed": 85, "size": 6 },
+  "viewport": {
+    "height": 360,
+    "padding": 60
+  },
+  "tokens": {
+    "color": "#3D6B52",
+    "speed": 85,
+    "size": 6
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#3D6B52",
+      "speed": 85,
+      "size": 6
+    },
+    "feedback": {
+      "color": "#D97706",
+      "shape": "rect",
+      "size": 5,
+      "speed": 80
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "set", "type": "port", "role": "source", "shape": "circle", "icon": "target", "x": 80, "y": 180 },
-    { "id": "ctrl", "type": "process", "label": "Controller", "icon": "sliders-horizontal", "gate": { "from": "any", "count": 1 }, "duration": 500, "x": 250, "y": 180 },
-    { "id": "plant", "type": "process", "label": "Plant", "icon": "factory", "tone": "warning", "duration": 1200, "x": 430, "y": 180 },
-    { "id": "sensor", "type": "process", "label": "Sensor", "icon": "gauge", "duration": 400, "retry": { "backEdge": "fb", "maxRetries": 1 }, "x": 610, "y": 180 }
+    {
+      "id": "set",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "target",
+      "x": 80,
+      "y": 180
+    },
+    {
+      "id": "ctrl",
+      "type": "process",
+      "label": "Controller",
+      "icon": "sliders-horizontal",
+      "x": 250,
+      "y": 180
+    },
+    {
+      "id": "plant",
+      "type": "process",
+      "label": "Plant",
+      "icon": "factory",
+      "tone": "warning",
+      "x": 430,
+      "y": 180
+    },
+    {
+      "id": "sensor",
+      "type": "process",
+      "label": "Sensor",
+      "icon": "gauge",
+      "x": 610,
+      "y": 180
+    }
   ],
   "edges": [
-    { "id": "e1", "from": "set", "to": "ctrl", "label": { "text": "ref" } },
-    { "id": "e2", "from": "ctrl", "to": "plant", "label": { "text": "u" } },
-    { "id": "e3", "from": "plant", "to": "sensor", "label": { "text": "y" } },
-    { "id": "fb", "from": "sensor", "to": "ctrl", "routing": "loopback", "stroke": { "color": "success", "dash": "dash" },
-      "label": { "text": "feedback" } }
+    {
+      "id": "e1",
+      "from": "set",
+      "to": "ctrl",
+      "label": {
+        "text": "ref"
+      }
+    },
+    {
+      "id": "e2",
+      "from": "ctrl",
+      "to": "plant",
+      "label": {
+        "text": "u"
+      }
+    },
+    {
+      "id": "e3",
+      "from": "plant",
+      "to": "sensor",
+      "label": {
+        "text": "y"
+      }
+    },
+    {
+      "id": "fb",
+      "from": "sensor",
+      "to": "ctrl",
+      "routing": "loopback",
+      "stroke": {
+        "color": "success",
+        "dash": "dash"
+      },
+      "label": {
+        "text": "feedback"
+      }
+    }
   ],
-  "sources": [{ "edge": "e1", "interval": 6000 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Controle em malha fechada",
+          "description": "O controlador compara a referência com a medição do sensor e ajusta a saída até estabilizar o sistema.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "e1",
+          "token": "default",
+          "title": "Setpoint → Controller",
+          "description": "Referência desejada: temperatura = 22 °C."
+        }
+      },
+      {
+        "setPill": {
+          "node": "ctrl",
+          "pill": "PID",
+          "tone": "primary",
+          "title": "Controlador ativo",
+          "description": "Modo PID com ganhos Kp, Ki, Kd calibrados."
+        }
+      },
+      {
+        "dwell": {
+          "node": "ctrl",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Controller",
+          "description": "Primeiro ciclo: erro = ref − y ≈ 5 °C → sinal de controle u elevado."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e2",
+          "token": "default",
+          "title": "Controller → Plant",
+          "description": "Atuador recebe comando u para aquecer o sistema."
+        }
+      },
+      {
+        "dwell": {
+          "node": "plant",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "Plant",
+          "description": "Processo físico responde com inércia térmica — temperatura sobe gradualmente."
+        }
+      },
+      {
+        "setPill": {
+          "node": "plant",
+          "pill": "y=19°C",
+          "tone": "warning",
+          "title": "Saída parcial",
+          "description": "Ainda abaixo do setpoint — controle continua atuando."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "default",
+          "title": "Plant → Sensor",
+          "description": "Temperatura medida e digitalizada."
+        }
+      },
+      {
+        "dwell": {
+          "node": "sensor",
+          "effect": "processing",
+          "ms": 400,
+          "title": "Sensor",
+          "description": "Leitura y = 19 °C com ruído ±0.1 °C."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Feedback reverso",
+          "description": "O sinal de medição percorre a aresta de feedback em direção reversa (sensor → controller) para fechar o loop.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "fb",
+          "token": "feedback",
+          "direction": "reverse",
+          "title": "Feedback → Controller",
+          "description": "Medição retorna ao controlador pela aresta loopback (direction: reverse)."
+        }
+      },
+      {
+        "setEffect": {
+          "node": "ctrl",
+          "effect": "processing",
+          "title": "Correção PID",
+          "description": "Erro reduzido → u diminui para evitar overshoot."
+        }
+      },
+      {
+        "dwell": {
+          "node": "ctrl",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Controller — 2º ciclo",
+          "description": "e = 22 − 19 = 3 °C; integral acumula; derivada antecipa convergência."
+        }
+      },
+      {
+        "setPill": {
+          "node": "ctrl",
+          "pill": "e=3°C",
+          "tone": "success",
+          "title": "Erro diminuindo",
+          "description": "Malha fechada converge para o setpoint."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

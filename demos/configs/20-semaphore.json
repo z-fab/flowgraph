@@ -3,23 +3,181 @@
   "viewport": {
     "height": 360,
     "padding": 55,
-    "background": { "color": "#FAFAF8", "pattern": "dots", "patternColor": "#E8E4DC", "patternSize": 18 }
+    "background": {
+      "color": "#FAFAF8",
+      "pattern": "dots",
+      "patternColor": "#E8E4DC",
+      "patternSize": 18
+    }
   },
-  "tokens": { "color": "#7C3AED", "speed": 100, "size": 6 },
+  "tokens": {
+    "color": "#7C3AED",
+    "speed": 100,
+    "size": 6
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "speed": 100,
+      "size": 6
+    },
+    "reject": {
+      "shape": "rect",
+      "color": "#9B1C1C",
+      "speed": 110
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "client", "type": "port", "role": "source", "shape": "circle", "icon": "users", "x": 80, "y": 180 },
-    { "id": "sem", "type": "process", "label": "Semaphore", "icon": "shield", "duration": 2200,
-      "admission": { "mode": "slot", "max": 2, "rejectEdge": "reject" },
-      "emit": { "mode": "map", "map": { "accept": 1 } },
-      "pillTop": [{ "text": "max 2", "tone": "warning" }], "x": 260, "y": 180 },
-    { "id": "ok", "type": "port", "role": "sink", "label": "Accepted", "icon": "check", "tone": "success", "x": 460, "y": 120 },
-    { "id": "rej", "type": "port", "role": "sink", "shape": "circle", "icon": "ban", "tone": "danger", "x": 460, "y": 260 }
+    {
+      "id": "client",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "users",
+      "x": 80,
+      "y": 180
+    },
+    {
+      "id": "sem",
+      "type": "process",
+      "label": "Semaphore",
+      "icon": "shield",
+      "pillTop": [{ "text": "0/2", "tone": "primary" }],
+      "x": 260,
+      "y": 180
+    },
+    {
+      "id": "ok",
+      "type": "port",
+      "role": "sink",
+      "label": "Accepted",
+      "icon": "check",
+      "tone": "success",
+      "x": 460,
+      "y": 120
+    },
+    {
+      "id": "rej",
+      "type": "port",
+      "role": "sink",
+      "shape": "circle",
+      "icon": "ban",
+      "tone": "danger",
+      "x": 460,
+      "y": 260
+    }
   ],
   "edges": [
     { "id": "in", "from": "client", "to": "sem" },
-    { "id": "accept", "from": "sem", "to": "ok", "stroke": { "color": "success" }, "label": { "text": "200 OK" } },
-    { "id": "reject", "from": "sem", "to": "rej", "stroke": { "color": "danger", "dash": "dash" },
-      "label": { "text": "429" }, "token": { "shape": "rect", "color": "danger" } }
+    {
+      "id": "accept",
+      "from": "sem",
+      "to": "ok",
+      "stroke": { "color": "success" },
+      "label": { "text": "200 OK" }
+    },
+    {
+      "id": "accept-back",
+      "from": "ok",
+      "to": "client",
+      "routing": "bezier",
+      "stroke": { "color": "success" },
+      "label": { "text": "200 OK" }
+    },
+    {
+      "id": "reject-back",
+      "from": "rej",
+      "to": "client",
+      "routing": "bezier",
+      "stroke": { "color": "danger", "dash": "dash" },
+      "label": { "text": "429" }
+    }
   ],
-  "sources": [{ "edge": "in", "interval": 700, "burst": { "count": 2, "spacing": 80 } }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 500,
+    "narration": { "showOnCanvas": true, "position": "top-left" },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Semáforo (max 2)",
+          "description": "Até dois requests em paralelo; o terceiro recebe 429.",
+          "ms": 700
+        }
+      },
+      {
+        "travel": { "edge": "in", "token": "default", "title": "Request 1" }
+      },
+      {
+        "setPill": { "node": "sem", "pill": "1/2", "tone": "warning" }
+      },
+      {
+        "dwell": {
+          "node": "sem",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Slot 1 ocupado"
+        }
+      },
+      {
+        "travel": { "edge": "accept", "token": "default", "title": "200 OK" }
+      },
+      {
+        "travel": { "edge": "accept-back", "token": "default", "title": "→ Client" }
+      },
+      {
+        "travel": { "edge": "in", "token": "default", "title": "Request 2" }
+      },
+      {
+        "setPill": { "node": "sem", "pill": "2/2", "tone": "danger" }
+      },
+      {
+        "dwell": {
+          "node": "sem",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Capacidade cheia"
+        }
+      },
+      {
+        "travel": { "edge": "accept", "token": "default" }
+      },
+      {
+        "travel": { "edge": "accept-back", "token": "default", "title": "→ Client" }
+      },
+      {
+        "travel": { "edge": "in", "token": "default", "title": "Request 3 (overflow)" }
+      },
+      {
+        "dwell": {
+          "node": "sem",
+          "effect": "waiting",
+          "ms": 300,
+          "title": "Sem slot livre",
+          "description": "Rejeição imediata — fail-fast."
+        }
+      },
+      {
+        "travel": {
+          "edge": "reject",
+          "token": "reject",
+          "title": "429 Too Many Requests"
+        }
+      },
+      {
+        "travel": {
+          "edge": "reject-back",
+          "token": "reject",
+          "title": "429 → Client"
+        }
+      },
+      {
+        "setPill": { "node": "sem", "pill": "0/2", "tone": "primary" }
+      },
+      { "wait": { "ms": 1000 } }
+    ]
+  }
 }

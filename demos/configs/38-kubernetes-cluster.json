@@ -1,0 +1,371 @@
+{
+  "title": "K8s cluster",
+  "viewport": {
+    "height": 460,
+    "padding": 55
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
+  "nodes": [
+    {
+      "id": "client",
+      "type": "port",
+      "role": "source",
+      "label": "Client",
+      "shape": "circle",
+      "icon": "smartphone",
+      "x": 60,
+      "y": 220
+    },
+    {
+      "id": "ingress",
+      "type": "process",
+      "label": "Ingress",
+      "icon": "globe",
+      "x": 180,
+      "y": 220
+    },
+    {
+      "id": "svc",
+      "type": "process",
+      "label": "Service",
+      "icon": "network",
+      "x": 300,
+      "y": 220,
+      "pillTop": [
+        {
+          "text": "kube-proxy",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "pod1",
+      "type": "process",
+      "label": "Pod 1",
+      "icon": "box",
+      "x": 480,
+      "y": 100,
+      "pillTop": [
+        {
+          "text": "ready",
+          "tone": "success"
+        }
+      ]
+    },
+    {
+      "id": "pod2",
+      "type": "process",
+      "label": "Pod 2",
+      "icon": "box",
+      "x": 480,
+      "y": 220
+    },
+    {
+      "id": "pod3",
+      "type": "process",
+      "label": "Pod 3",
+      "icon": "box",
+      "x": 480,
+      "y": 340
+    }
+  ],
+  "edges": [
+    {
+      "id": "ci",
+      "from": "client",
+      "to": "ingress"
+    },
+    {
+      "id": "is",
+      "from": "ingress",
+      "to": "svc"
+    },
+    {
+      "id": "sp1",
+      "from": "svc",
+      "to": "pod1",
+      "label": {
+        "text": "endpoint"
+      }
+    },
+    {
+      "id": "sp2",
+      "from": "svc",
+      "to": "pod2"
+    },
+    {
+      "id": "sp3",
+      "from": "svc",
+      "to": "pod3"
+    },
+    {
+      "id": "p1b",
+      "from": "pod1",
+      "to": "svc",
+      "routing": "loopback",
+      "loopSide": "above",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "200 OK"
+      }
+    },
+    {
+      "id": "p2b",
+      "from": "pod2",
+      "to": "svc",
+      "routing": "loopback",
+      "stroke": {
+        "color": "success"
+      }
+    },
+    {
+      "id": "p3b",
+      "from": "pod3",
+      "to": "svc",
+      "routing": "loopback",
+      "loopSide": "below",
+      "stroke": {
+        "color": "success"
+      }
+    },
+    {
+      "id": "sib",
+      "from": "svc",
+      "to": "ingress",
+      "routing": "loopback",
+      "loopSide": "above",
+      "stroke": {
+        "color": "success"
+      }
+    },
+    {
+      "id": "ic",
+      "from": "ingress",
+      "to": "client",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "HTTP response"
+      }
+    },
+    {
+      "id": "err",
+      "from": "ingress",
+      "to": "client",
+      "routing": "bezier",
+      "stroke": {
+        "color": "danger",
+        "dash": "dash"
+      },
+      "label": {
+        "text": "503"
+      }
+    }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left"
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Cluster Kubernetes",
+          "description": "Ingress termina TLS; Service (kube-proxy) load-balanceia entre pods saudáveis.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "ci",
+          "token": "default",
+          "title": "Client → Ingress",
+          "description": "HTTP request chega ao cluster."
+        }
+      },
+      {
+        "dwell": {
+          "node": "ingress",
+          "effect": "processing",
+          "ms": 120,
+          "title": "Ingress",
+          "description": "TLS termination e roteamento por host/path."
+        }
+      },
+      {
+        "travel": {
+          "edge": "is",
+          "token": "default",
+          "title": "Ingress → Service"
+        }
+      },
+      {
+        "dwell": {
+          "node": "svc",
+          "effect": "processing",
+          "ms": 80,
+          "title": "Service",
+          "description": "kube-proxy seleciona endpoint saudável (round-robin)."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Rota 1 — Pod saudável",
+          "description": "Primeira requisição vai ao Pod 1; resposta retorna pelo mesmo caminho HTTP.",
+          "ms": 700
+        }
+      },
+      {
+        "travel": {
+          "edge": "sp1",
+          "token": "default",
+          "title": "Service → Pod 1"
+        }
+      },
+      {
+        "dwell": {
+          "node": "pod1",
+          "effect": "processing",
+          "ms": 650,
+          "title": "Pod 1",
+          "description": "Container processa a requisição."
+        }
+      },
+      {
+        "travel": {
+          "edge": "p1b",
+          "token": "default",
+          "title": "Pod 1 → Service"
+        }
+      },
+      {
+        "travel": {
+          "edge": "sib",
+          "token": "default",
+          "title": "Service → Ingress"
+        }
+      },
+      {
+        "travel": {
+          "edge": "ic",
+          "token": "default",
+          "title": "200 OK → Client"
+        }
+      },
+      {
+        "narrate": {
+          "title": "Pod 1 unhealthy",
+          "description": "Liveness probe falha — endpoint removido; nova requisição vai ao Pod 2.",
+          "ms": 900
+        }
+      },
+      {
+        "setEffect": {
+          "node": "pod1",
+          "effect": "open",
+          "title": "Pod 1 unhealthy"
+        }
+      },
+      {
+        "setPill": {
+          "node": "pod1",
+          "pill": "unhealthy",
+          "tone": "danger"
+        }
+      },
+      {
+        "setPill": {
+          "node": "svc",
+          "pill": "skip pod1",
+          "tone": "warning"
+        }
+      },
+      {
+        "travel": {
+          "edge": "ci",
+          "token": "default",
+          "title": "Nova requisição"
+        }
+      },
+      {
+        "travel": {
+          "edge": "is",
+          "token": "default"
+        }
+      },
+      {
+        "travel": {
+          "edge": "sp2",
+          "token": "default",
+          "title": "Service → Pod 2",
+          "description": "Failover transparente para endpoint saudável."
+        }
+      },
+      {
+        "dwell": {
+          "node": "pod2",
+          "effect": "processing",
+          "ms": 550,
+          "title": "Pod 2"
+        }
+      },
+      {
+        "travel": {
+          "edge": "p2b",
+          "token": "default"
+        }
+      },
+      {
+        "travel": {
+          "edge": "sib",
+          "token": "default"
+        }
+      },
+      {
+        "travel": {
+          "edge": "ic",
+          "token": "default",
+          "title": "200 OK → Client"
+        }
+      },
+      {
+        "setEffect": {
+          "node": "pod1",
+          "effect": ""
+        }
+      },
+      {
+        "setPill": {
+          "node": "pod1",
+          "pill": "ready",
+          "tone": "success"
+        }
+      },
+      {
+        "setPill": {
+          "node": "svc",
+          "pill": "kube-proxy",
+          "tone": "primary"
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,275 @@
+{
+  "title": "XGBoost train",
+  "viewport": {
+    "height": 380,
+    "padding": 55
+  },
+  "tokens": {
+    "color": "#D97706",
+    "shape": "roundedRect",
+    "size": 6,
+    "speed": 90
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#D97706",
+      "shape": "roundedRect",
+      "size": 6,
+      "speed": 90
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
+  "nodes": [
+    {
+      "id": "data",
+      "type": "port",
+      "role": "source",
+      "label": "Dataset",
+      "shape": "circle",
+      "icon": "table",
+      "x": 70,
+      "y": 190
+    },
+    {
+      "id": "init",
+      "type": "process",
+      "label": "Init model",
+      "icon": "play",
+      "x": 200,
+      "y": 190,
+      "pillTop": [
+        {
+          "text": "loss=1.0",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "round",
+      "type": "process",
+      "label": "Boost round",
+      "icon": "repeat",
+      "x": 340,
+      "y": 190,
+      "pillTop": [
+        {
+          "text": "round++",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "tree",
+      "type": "process",
+      "label": "Fit tree",
+      "icon": "git-branch",
+      "x": 480,
+      "y": 190,
+      "tone": "success"
+    },
+    {
+      "id": "eval",
+      "type": "port",
+      "role": "terminal",
+      "label": "Eval / early stop",
+      "icon": "check-circle",
+      "tone": "success",
+      "x": 620,
+      "y": 190
+    }
+  ],
+  "edges": [
+    {
+      "id": "ed",
+      "from": "data",
+      "to": "init"
+    },
+    {
+      "id": "ir",
+      "from": "init",
+      "to": "round"
+    },
+    {
+      "id": "lt",
+      "from": "round",
+      "to": "tree",
+      "label": {
+        "text": "gradients"
+      }
+    },
+    {
+      "id": "lr",
+      "from": "tree",
+      "to": "round",
+      "routing": "loopback",
+      "loopSide": "below",
+      "label": {
+        "text": "update residuals"
+      },
+      "stroke": {
+        "dash": "dash",
+        "color": "warning"
+      }
+    },
+    {
+      "id": "ee",
+      "from": "round",
+      "to": "eval",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "max rounds"
+      }
+    }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left"
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Gradient Boosting",
+          "description": "XGBoost adiciona árvores sequencialmente; cada rodada corrige os resíduos da anterior.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "ed",
+          "token": "default",
+          "title": "Dataset → Init model",
+          "description": "Features e labels entram no pipeline."
+        }
+      },
+      {
+        "dwell": {
+          "node": "init",
+          "effect": "processing",
+          "ms": 250,
+          "title": "Init model",
+          "description": "Predição inicial constante — loss=1.0."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ir",
+          "token": "default",
+          "title": "Init → Boost round",
+          "description": "Inicia a primeira rodada de boosting."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Rodada 1",
+          "description": "Gradientes da loss guiam o fit da próxima árvore fraca.",
+          "ms": 650
+        }
+      },
+      {
+        "dwell": {
+          "node": "round",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Boost round",
+          "description": "Computa ∂L/∂ŷ e atualiza resíduos."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lt",
+          "token": "default",
+          "title": "Round → Fit tree",
+          "description": "Gradientes e hessianos alimentam splits ótimos."
+        }
+      },
+      {
+        "dwell": {
+          "node": "tree",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Fit tree",
+          "description": "Árvore de regressão nos resíduos negativos."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lr",
+          "token": "default",
+          "title": "Loopback — update residuals",
+          "description": "ŷ += η·tree; resíduos diminuem para a próxima rodada."
+        }
+      },
+      {
+        "setPill": {
+          "node": "round",
+          "pill": "round=2",
+          "tone": "primary",
+          "title": "Rodada 2",
+          "description": "O loopback reinicia o ciclo de boosting."
+        }
+      },
+      {
+        "dwell": {
+          "node": "round",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Boost round",
+          "description": "Novos gradientes com base no ensemble atual."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lt",
+          "token": "default",
+          "title": "Round → Fit tree",
+          "description": "Segunda árvore corrige erros remanescentes."
+        }
+      },
+      {
+        "dwell": {
+          "node": "tree",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Fit tree",
+          "description": "Mais um weak learner adicionado ao ensemble."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lr",
+          "token": "default",
+          "title": "Loopback — update residuals",
+          "description": "Resíduos atualizados; loss cai a cada iteração."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Early stopping",
+          "description": "Após max_rounds ou plateau na validação, o treino encerra.",
+          "ms": 750
+        }
+      },
+      {
+        "travel": {
+          "edge": "ee",
+          "token": "default",
+          "title": "Round → Eval",
+          "description": "Métricas de validação decidem se continua ou para."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
+}

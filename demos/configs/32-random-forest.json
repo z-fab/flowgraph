@@ -1,0 +1,323 @@
+{
+  "title": "Random Forest train",
+  "viewport": {
+    "height": 400,
+    "padding": 55
+  },
+  "tokens": {
+    "color": "#3D6B52",
+    "shape": "roundedRect",
+    "size": 6,
+    "speed": 85
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#3D6B52",
+      "shape": "roundedRect",
+      "size": 6,
+      "speed": 85
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
+  "nodes": [
+    {
+      "id": "data",
+      "type": "port",
+      "role": "source",
+      "label": "Dataset",
+      "shape": "circle",
+      "icon": "table",
+      "x": 70,
+      "y": 200
+    },
+    {
+      "id": "bootstrap",
+      "type": "process",
+      "label": "Bootstrap",
+      "icon": "shuffle",
+      "x": 210,
+      "y": 200,
+      "pillTop": [
+        {
+          "text": "N=3 trees",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "t1",
+      "type": "process",
+      "label": "Tree 1",
+      "icon": "git-branch",
+      "x": 400,
+      "y": 90,
+      "pillTop": [
+        {
+          "text": "fit",
+          "tone": "success"
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "type": "process",
+      "label": "Tree 2",
+      "icon": "git-branch",
+      "x": 400,
+      "y": 200
+    },
+    {
+      "id": "t3",
+      "type": "process",
+      "label": "Tree 3",
+      "icon": "git-branch",
+      "x": 400,
+      "y": 310
+    },
+    {
+      "id": "vote",
+      "type": "process",
+      "label": "Majority vote",
+      "icon": "vote",
+      "x": 560,
+      "y": 200,
+      "pillTop": [
+        {
+          "text": "fan-in",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "oob",
+      "type": "port",
+      "role": "terminal",
+      "label": "OOB metrics",
+      "icon": "chart-line",
+      "tone": "success",
+      "x": 720,
+      "y": 200
+    }
+  ],
+  "edges": [
+    {
+      "id": "ed",
+      "from": "data",
+      "to": "bootstrap"
+    },
+    {
+      "id": "et1",
+      "from": "bootstrap",
+      "to": "t1",
+      "label": {
+        "text": "sample"
+      }
+    },
+    {
+      "id": "et2",
+      "from": "bootstrap",
+      "to": "t2"
+    },
+    {
+      "id": "et3",
+      "from": "bootstrap",
+      "to": "t3"
+    },
+    {
+      "id": "v1",
+      "from": "t1",
+      "to": "vote",
+      "stroke": {
+        "color": "success"
+      }
+    },
+    {
+      "id": "v2",
+      "from": "t2",
+      "to": "vote"
+    },
+    {
+      "id": "v3",
+      "from": "t3",
+      "to": "vote"
+    },
+    {
+      "id": "vo",
+      "from": "vote",
+      "to": "oob",
+      "label": {
+        "text": "acc"
+      },
+      "stroke": {
+        "color": "success"
+      }
+    }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left"
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Random Forest",
+          "description": "Cada árvore treina em um bootstrap sample paralelo; o voto majoritário agrega as predições.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "ed",
+          "token": "default",
+          "title": "Dataset → Bootstrap",
+          "description": "O conjunto completo alimenta o amostrador com reposição."
+        }
+      },
+      {
+        "dwell": {
+          "node": "bootstrap",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Bootstrap",
+          "description": "Gera N=3 amostras independentes (~63% únicos por árvore)."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Fan-out paralelo",
+          "description": "Cada sample segue para uma árvore de decisão em paralelo.",
+          "ms": 650
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "et1",
+              "token": "default",
+              "title": "→ Tree 1",
+              "description": "Sample com reposição."
+            }
+          },
+          {
+            "travel": {
+              "edge": "et2",
+              "token": "default",
+              "title": "→ Tree 2",
+              "delay": 120
+            }
+          },
+          {
+            "travel": {
+              "edge": "et3",
+              "token": "default",
+              "title": "→ Tree 3",
+              "delay": 240
+            }
+          }
+        ]
+      },
+      {
+        "parallel": [
+          {
+            "dwell": {
+              "node": "t1",
+              "effect": "processing",
+              "ms": 500,
+              "title": "Tree 1",
+              "description": "fit() nos splits de Gini."
+            }
+          },
+          {
+            "dwell": {
+              "node": "t2",
+              "effect": "processing",
+              "ms": 500,
+              "title": "Tree 2",
+              "delay": 80
+            }
+          },
+          {
+            "dwell": {
+              "node": "t3",
+              "effect": "processing",
+              "ms": 500,
+              "title": "Tree 3",
+              "delay": 160
+            }
+          }
+        ]
+      },
+      {
+        "narrate": {
+          "title": "Fan-in — voto majoritário",
+          "description": "Cada árvore envia seu voto; o agregador escolhe a classe mais frequente.",
+          "ms": 750
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "v1",
+              "token": "default",
+              "title": "Tree 1 → Vote"
+            }
+          },
+          {
+            "travel": {
+              "edge": "v2",
+              "token": "default",
+              "title": "Tree 2 → Vote",
+              "delay": 100
+            }
+          },
+          {
+            "travel": {
+              "edge": "v3",
+              "token": "default",
+              "title": "Tree 3 → Vote",
+              "delay": 200
+            }
+          }
+        ]
+      },
+      {
+        "dwell": {
+          "node": "vote",
+          "effect": "waiting",
+          "ms": 280,
+          "title": "Majority vote",
+          "description": "Aguarda todos os votos antes do reduce."
+        }
+      },
+      {
+        "dwell": {
+          "node": "vote",
+          "effect": "processing",
+          "ms": 320,
+          "title": "Majority vote",
+          "description": "argmax dos votos por classe."
+        }
+      },
+      {
+        "travel": {
+          "edge": "vo",
+          "token": "default",
+          "title": "Vote → OOB metrics",
+          "description": "Acurácia out-of-bag estima generalização sem hold-out."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
+}

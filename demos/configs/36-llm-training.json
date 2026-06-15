@@ -1,0 +1,314 @@
+{
+  "title": "LLM pretrain",
+  "viewport": {
+    "height": 400,
+    "padding": 55
+  },
+  "tokens": {
+    "color": "#D97706",
+    "shape": "roundedRect",
+    "size": 6,
+    "speed": 85
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#D97706",
+      "shape": "roundedRect",
+      "size": 6,
+      "speed": 85
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
+  "nodes": [
+    {
+      "id": "shard",
+      "type": "port",
+      "role": "source",
+      "label": "Data shard",
+      "shape": "circle",
+      "icon": "hard-drive",
+      "x": 70,
+      "y": 200
+    },
+    {
+      "id": "loader",
+      "type": "process",
+      "label": "DataLoader",
+      "icon": "layers",
+      "x": 210,
+      "y": 200,
+      "pillTop": [
+        {
+          "text": "micro-batch",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "fwd",
+      "type": "process",
+      "label": "Forward",
+      "icon": "arrow-right",
+      "x": 360,
+      "y": 200,
+      "tone": "warning"
+    },
+    {
+      "id": "loss",
+      "type": "process",
+      "label": "Loss",
+      "icon": "chart-line",
+      "x": 500,
+      "y": 200,
+      "pillTop": [
+        {
+          "text": "loss↓",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "bwd",
+      "type": "process",
+      "label": "Backward",
+      "icon": "arrow-left",
+      "x": 640,
+      "y": 200,
+      "tone": "primary"
+    },
+    {
+      "id": "optim",
+      "type": "process",
+      "label": "Optimizer",
+      "icon": "settings",
+      "x": 780,
+      "y": 200,
+      "pillTop": [
+        {
+          "text": "AdamW",
+          "tone": "success"
+        }
+      ]
+    },
+    {
+      "id": "ckpt",
+      "type": "port",
+      "role": "terminal",
+      "label": "Checkpoint",
+      "icon": "save",
+      "tone": "success",
+      "x": 920,
+      "y": 190
+    }
+  ],
+  "edges": [
+    {
+      "id": "es",
+      "from": "shard",
+      "to": "loader"
+    },
+    {
+      "id": "lf",
+      "from": "loader",
+      "to": "fwd"
+    },
+    {
+      "id": "fl",
+      "from": "fwd",
+      "to": "loss"
+    },
+    {
+      "id": "lb",
+      "from": "loss",
+      "to": "bwd",
+      "label": {
+        "text": "grad"
+      },
+      "stroke": {
+        "color": "warning",
+        "dash": "dash"
+      }
+    },
+    {
+      "id": "bo",
+      "from": "bwd",
+      "to": "optim",
+      "label": {
+        "text": "∂W"
+      }
+    },
+    {
+      "id": "eloop",
+      "from": "optim",
+      "to": "loader",
+      "routing": "loopback",
+      "loopSide": "below",
+      "label": {
+        "text": "next batch"
+      },
+      "stroke": {
+        "dash": "dash",
+        "color": "primary"
+      }
+    },
+    {
+      "id": "eck",
+      "from": "optim",
+      "to": "ckpt",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "ckpt"
+      }
+    }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left"
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Treino de LLM",
+          "description": "Cada micro-batch percorre forward → loss → backward → optimizer antes do próximo lote.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "es",
+          "token": "default",
+          "title": "Data shard → DataLoader",
+          "description": "Shard de texto tokenizado no disco."
+        }
+      },
+      {
+        "dwell": {
+          "node": "loader",
+          "effect": "processing",
+          "ms": 300,
+          "title": "DataLoader",
+          "description": "Monta micro-batch (ex.: 4 seq × 2048 tokens)."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lf",
+          "token": "default",
+          "title": "Loader → Forward",
+          "description": "Tensores enviados à GPU."
+        }
+      },
+      {
+        "dwell": {
+          "node": "fwd",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Forward",
+          "description": "Passagem pelas camadas do transformer — logits na saída."
+        }
+      },
+      {
+        "travel": {
+          "edge": "fl",
+          "token": "default",
+          "title": "Forward → Loss",
+          "description": "Cross-entropy sobre próximo token."
+        }
+      },
+      {
+        "dwell": {
+          "node": "loss",
+          "effect": "processing",
+          "ms": 180,
+          "title": "Loss",
+          "description": "L = −log P(token|context); loss↓ a cada step."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lb",
+          "token": "default",
+          "title": "Loss → Backward",
+          "description": "Gradientes fluem pela cadeia computacional."
+        }
+      },
+      {
+        "dwell": {
+          "node": "bwd",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Backward",
+          "description": "autograd.propagate — ∂L/∂W em cada parâmetro."
+        }
+      },
+      {
+        "travel": {
+          "edge": "bo",
+          "token": "default",
+          "title": "Backward → Optimizer",
+          "description": "Acumula gradientes do micro-batch."
+        }
+      },
+      {
+        "dwell": {
+          "node": "optim",
+          "effect": "processing",
+          "ms": 320,
+          "title": "Optimizer",
+          "description": "AdamW atualiza pesos com weight decay."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Próximo micro-batch",
+          "description": "O loopback reinicia o ciclo até esgotar o shard ou atingir o step alvo.",
+          "ms": 700
+        }
+      },
+      {
+        "travel": {
+          "edge": "eloop",
+          "token": "default",
+          "title": "Loopback — next batch",
+          "description": "DataLoader puxa o próximo micro-batch."
+        }
+      },
+      {
+        "dwell": {
+          "node": "loader",
+          "effect": "processing",
+          "ms": 280,
+          "title": "DataLoader",
+          "description": "Prefetch assíncrono do próximo lote."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Checkpoint",
+          "description": "Periodicamente os pesos são salvos para retomar o treino.",
+          "ms": 650
+        }
+      },
+      {
+        "travel": {
+          "edge": "eck",
+          "token": "default",
+          "title": "Optimizer → Checkpoint",
+          "description": "state_dict + optimizer state em disco."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowgraph.dev/schema/flowgraph-v2.json",
+  "title": "FlowGraph v2",
+  "description": "Visual flow animator — topology + scripted scenario",
+  "type": "object",
+  "required": ["nodes", "edges", "scenario"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "title": { "type": "string" },
+    "autoStart": { "type": "boolean", "default": true },
+    "injectStyles": { "type": "boolean", "default": true },
+    "viewport": {
+      "type": "object",
+      "properties": {
+        "width": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+        "height": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+        "padding": { "type": "number" }
+      }
+    },
+    "theme": { "type": "object" },
+    "tokens": {
+      "type": "object",
+      "properties": {
+        "shape": { "enum": ["circle", "rect", "roundedRect"] },
+        "size": { "type": "number" },
+        "speed": { "type": "number" },
+        "color": { "type": "string" }
+      }
+    },
+    "tokenTypes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "shape": { "enum": ["circle", "rect", "roundedRect"] },
+          "size": { "type": "number" },
+          "speed": { "type": "number" },
+          "color": { "type": "string" }
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "engine": { "enum": ["layered", "dagre"] },
+        "direction": { "enum": ["LR", "TB"] },
+        "rankGap": { "type": "number" },
+        "nodeGap": { "type": "number" }
+      }
+    },
+    "controls": { "type": "object" },
+    "interaction": { "type": "object" },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/node" },
+      "minItems": 1
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/edge" },
+      "minItems": 0
+    },
+    "scenario": { "$ref": "#/$defs/scenario" }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "enum": ["port", "process"] },
+        "role": { "enum": ["source", "sink", "terminal"] },
+        "label": { "type": "string" },
+        "icon": { "type": "string" },
+        "shape": { "enum": ["rect", "roundedRect", "circle", "diamond"] },
+        "tone": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "pillTop": { "type": "array" },
+        "pillBottom": { "type": "array" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "id": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "routing": { "enum": ["bezier", "straight", "loopback", "orthogonal"] },
+        "loopSide": { "enum": ["above", "below"] },
+        "label": { "type": "object" },
+        "stroke": { "type": "object" },
+        "token": { "type": "object" }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "required": ["steps"],
+      "properties": {
+        "loop": { "type": "boolean", "default": true },
+        "playInterval": { "type": "number", "default": 400 },
+        "narration": {
+          "type": "object",
+          "properties": {
+            "showOnCanvas": { "type": "boolean" },
+            "position": { "enum": ["top-left", "top-right", "bottom-left", "bottom-right"] },
+            "maxWidth": { "type": "number" }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/step" },
+          "minItems": 1
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "oneOf": [
+        { "required": ["travel"], "properties": { "travel": { "$ref": "#/$defs/travelStep" } } },
+        { "required": ["dwell"], "properties": { "dwell": { "$ref": "#/$defs/dwellStep" } } },
+        { "required": ["parallel"], "properties": { "parallel": { "type": "array", "items": { "$ref": "#/$defs/step" } } } },
+        { "required": ["setPill"], "properties": { "setPill": { "type": "object" } } },
+        { "required": ["setEffect"], "properties": { "setEffect": { "type": "object" } } },
+        { "required": ["wait"], "properties": { "wait": { "type": "object" } } },
+        { "required": ["focus"], "properties": { "focus": { "type": "object" } } },
+        { "required": ["narrate"], "properties": { "narrate": { "type": "object" } } }
+      ]
+    },
+    "travelStep": {
+      "type": "object",
+      "required": ["edge"],
+      "properties": {
+        "edge": { "type": "string" },
+        "token": { "type": "string" },
+        "direction": { "enum": ["forward", "reverse"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "delay": { "type": "number" }
+      }
+    },
+    "dwellStep": {
+      "type": "object",
+      "required": ["node"],
+      "properties": {
+        "node": { "type": "string" },
+        "effect": { "enum": ["processing", "waiting", "open"] },
+        "ms": { "type": "number" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "delay": { "type": "number" }
+      }
+    }
+  }
+}

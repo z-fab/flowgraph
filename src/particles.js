@@ -5,8 +5,22 @@ const NS = 'http://www.w3.org/2000/svg';
 let nextTokenId = 1;
 
 function applyTokenColor(shapeEl, tokenCfg) {
-  const color = tokenCfg.color || '#7C3AED';
-  shapeEl.setAttribute('fill', color);
+  shapeEl.setAttribute('fill', tokenCfg.color || '#7C3AED');
+}
+
+function addTokenLabel(inner, text, size) {
+  let labelEl = inner.querySelector('.fg-token-label');
+  if (!labelEl) {
+    labelEl = document.createElementNS(NS, 'text');
+    labelEl.setAttribute('class', 'fg-token-label');
+    labelEl.setAttribute('text-anchor', 'middle');
+    labelEl.setAttribute('dominant-baseline', 'central');
+    inner.appendChild(labelEl);
+  }
+  const fontSize = Math.max(6, Math.round(size * 0.85));
+  labelEl.setAttribute('font-size', String(fontSize));
+  labelEl.setAttribute('fill', '#fff');
+  labelEl.textContent = text;
 }
 
 function createTokenShape(tokenCfg) {
@@ -36,6 +50,11 @@ function createTokenShape(tokenCfg) {
   }
   applyTokenColor(shapeEl, tokenCfg);
   inner.appendChild(shapeEl);
+
+  if (tokenCfg.label) {
+    addTokenLabel(inner, tokenCfg.label, size);
+  }
+
   g.appendChild(inner);
   g._fgInner = inner;
   g._fgShape = shapeEl;
@@ -49,11 +68,21 @@ function updateTokenElement(el, tokenCfg) {
   inner.className.baseVal = 'fg-token-inner';
   if (tokenCfg.effect) inner.classList.add(`fg-token-${tokenCfg.effect}`);
   applyTokenColor(shapeEl, tokenCfg);
+
+  const label = inner.querySelector('.fg-token-label');
+  if (tokenCfg.label) {
+    addTokenLabel(inner, tokenCfg.label, tokenCfg.size || 7);
+  } else if (label) {
+    label.remove();
+  }
 }
 
 function placeTokenAt(token, t) {
-  const pt = pathPointAt(token.path, t);
-  token.el.setAttribute('transform', `translate(${pt.x},${pt.y}) rotate(${(pt.angle * 180) / Math.PI})`);
+  const progress = token.reverse ? (1 - t) : t;
+  const pt = pathPointAt(token.path, progress);
+  let angle = pt.angle;
+  if (token.reverse) angle += Math.PI;
+  token.el.setAttribute('transform', `translate(${pt.x},${pt.y}) rotate(${(angle * 180) / Math.PI})`);
 }
 
 export class ParticleSystem {
@@ -64,51 +93,58 @@ export class ParticleSystem {
     this.pool = [];
     this.active = [];
     this.maxParticles = config.maxParticles || 200;
+    this.speedMultiplier = 1;
+  }
+
+  setSpeedMultiplier(m) {
+    this.speedMultiplier = m || 1;
   }
 
   spawn(options) {
-    const { edgeId, tokenCfg, onArrive, delay = 0 } = options;
+    const { edgeId, tokenCfg, onArrive, delay = 0, reverse = false } = options;
     if (this.active.length >= this.maxParticles) return null;
 
     const path = this.edgeRenderer.getPath(edgeId);
     if (!path) return null;
 
     const id = nextTokenId++;
-    const el = this._acquireElement(tokenCfg);
+    const cfg = { ...this.config.tokenDefault, ...tokenCfg };
+    const el = this._acquireElement(cfg);
     el.setAttribute('data-token-id', String(id));
     el.style.opacity = '0';
     this.layer.appendChild(el);
+
+    const edge = this.config.edgesById[edgeId];
+    const speed = (tokenCfg && tokenCfg.speed) || edge?.speed || this.config.tokenDefault.speed || 120;
 
     const token = {
       id,
       edgeId,
       el,
-      tokenCfg: { ...this.config.tokenDefault, ...tokenCfg },
+      tokenCfg: cfg,
       progress: 0,
       delay,
       delayLeft: delay,
       onArrive,
-      onSpawn: options.onSpawn || null,
       path,
       done: false,
-      speed: (tokenCfg && tokenCfg.speed) || this.config.tokenDefault.speed || 120,
+      speed,
+      reverse: !!reverse,
     };
     placeTokenAt(token, 0);
-    if (token.onSpawn) token.onSpawn(token);
     this.active.push(token);
     this.edgeRenderer.setActive(edgeId, true, token.tokenCfg.color);
     return token;
   }
 
   _acquireElement(tokenCfg) {
-    const cfg = { ...this.config.tokenDefault, ...tokenCfg };
     if (this.pool.length) {
       const el = this.pool.pop();
       el.className.baseVal = 'fg-token';
-      updateTokenElement(el, cfg);
+      updateTokenElement(el, tokenCfg);
       return el;
     }
-    return createTokenShape(cfg);
+    return createTokenShape(tokenCfg);
   }
 
   _release(token) {
@@ -120,6 +156,7 @@ export class ParticleSystem {
   update(dt) {
     const edgeCounts = {};
     const toRemove = [];
+    const speedMul = this.speedMultiplier || 1;
 
     this.active.forEach((token) => {
       if (token.delayLeft > 0) {
@@ -129,7 +166,7 @@ export class ParticleSystem {
 
       token.el.style.opacity = '1';
       const pathLen = token.path.getTotalLength() || 1;
-      const dist = token.speed * (dt / 1000);
+      const dist = token.speed * speedMul * (dt / 1000);
       token.progress += dist / pathLen;
 
       if (token.progress >= 1) {
@@ -157,28 +194,24 @@ export class ParticleSystem {
   }
 
   clear() {
-    this.active.slice().forEach((t) => this._release(t));
+    this.active.slice().forEach((t) => {
+      t.el.remove();
+      this.pool.push(t.el);
+    });
     this.active = [];
     Object.keys(this.edgeRenderer.edgeViews || {}).forEach((edgeId) => {
       this.edgeRenderer.setActive(edgeId, false);
     });
   }
 
-  countOnEdge(edgeId) {
-    return this.active.filter((t) => t.edgeId === edgeId).length;
-  }
-}
-
-export function spawnBurst(particles, edgeId, burst, tokenCfg, onArrive, onSpawn) {
-  const count = burst?.count || 1;
-  const spacing = burst?.spacing || 60;
-  for (let i = 0; i < count; i++) {
-    particles.spawn({
-      edgeId,
-      tokenCfg,
-      onArrive,
-      onSpawn,
-      delay: i * spacing,
+  travel(edgeId, tokenCfg, reverse = false) {
+    return new Promise((resolve) => {
+      this.spawn({
+        edgeId,
+        tokenCfg,
+        reverse,
+        onArrive: () => resolve(),
+      });
     });
   }
 }

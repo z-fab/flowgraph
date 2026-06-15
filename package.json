@@ -1,7 +1,7 @@
 {
   "name": "flowgraph",
-  "version": "1.0.0",
-  "description": "Lightweight animated flow diagrams with token simulation — port + process nodes, JSON config",
+  "version": "2.0.0",
+  "description": "Lightweight animated flow diagrams with scripted visual scenarios — JSON config",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -37,18 +37,20 @@
   "scripts": {
     "build": "node build.mjs",
     "test": "node --test tests/*.test.js",
+    "test:e2e": "playwright test",
     "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "flowchart",
     "diagram",
     "animation",
-    "simulation",
+    "scenario",
     "svg",
     "ml-serving",
     "visualization"
   ],
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "esbuild": "^0.25.0"
   },
   "dependencies": {

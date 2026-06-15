@@ -1,4 +1,5 @@
-import { buildEdgePath, computeEdgeAnchorOffsets, createPathElement, labelPosition } from './geometry.js';
+import { buildEdgePath, computeEdgeAnchorOffsets, createPathElement, edgePathControls, labelPosition } from './geometry.js';
+import { labelOnPolyline } from './edge-orthogonal.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -56,7 +57,8 @@ export function renderEdges(edgesLayer, labelsLayer, edges, nodesById, theme) {
     const toNode = nodesById[edge.to];
     if (!fromNode || !toNode) return;
 
-    const off = anchorOffsets[edge.id] || { fromAngle: 0, toAngle: 0, labelT: 0.5 };
+    const off = anchorOffsets[edge.id] || { fromAngle: 0, toAngle: 0, labelT: 0.5, lane: 0 };
+    const ctrl = edgePathControls(fromNode, toNode, edge.routing, off, edge.loopSide);
     const d = buildEdgePath(fromNode, toNode, edge.routing, off, edge.loopSide);
     const g = document.createElementNS(NS, 'g');
     g.setAttribute('class', 'fg-edge');
@@ -78,16 +80,23 @@ export function renderEdges(edgesLayer, labelsLayer, edges, nodesById, theme) {
       labelsLayer.appendChild(labelGroup.g);
     }
 
-    edgeViews[edge.id] = { g, path, labelGroup, edge, anchorOff: off };
+    edgeViews[edge.id] = { g, path, labelGroup, edge, anchorOff: off, ctrl };
   });
 
   function updateLabels() {
-    Object.values(edgeViews).forEach(({ path, labelGroup, edge, anchorOff }) => {
+    Object.values(edgeViews).forEach(({ path, labelGroup, edge, anchorOff, ctrl }) => {
       if (!labelGroup || !edge.label) return;
-      const rawT = anchorOff?.labelT ?? 0.5;
-      const t = Math.max(0.34, Math.min(0.66, rawT));
-      const baseOff = edge.label.offset != null ? edge.label.offset : 20;
-      const pos = labelPosition(path, edge.label.position, baseOff, t);
+
+      if (edge.routing === 'orthogonal' && ctrl?.kind === 'polyline') {
+        const pos = labelOnPolyline(ctrl.points, anchorOff?.lane || 0);
+        labelGroup.g.setAttribute('transform', `translate(${pos.x},${pos.y})`);
+        return;
+      }
+
+      const t = 0.5;
+      const baseOff = edge.label.offset != null ? edge.label.offset : 18;
+      const posLabel = edge.label.position === 'center' ? 'above' : (edge.label.position || 'above');
+      const pos = labelPosition(path, posLabel, baseOff, t);
       labelGroup.g.setAttribute('transform', `translate(${pos.x},${pos.y})`);
     });
   }
@@ -110,6 +119,7 @@ export function renderEdges(edgesLayer, labelsLayer, edges, nodesById, theme) {
         if (!fromNode || !toNode) return;
         const off = offsets[edge.id] || view.anchorOff;
         view.anchorOff = off;
+        view.ctrl = edgePathControls(fromNode, toNode, edge.routing, off, edge.loopSide);
         const d = buildEdgePath(fromNode, toNode, edge.routing, off, edge.loopSide);
         path.setAttribute('d', d);
       });
@@ -126,6 +136,11 @@ export function renderEdges(edgesLayer, labelsLayer, edges, nodesById, theme) {
       const view = edgeViews[edgeId];
       if (!view) return;
       view.path.classList.toggle('fg-edge-dimmed', !!dimmed);
+    },
+    setStepActive(edgeId, active) {
+      const view = edgeViews[edgeId];
+      if (!view) return;
+      view.g.classList.toggle('fg-edge-step-active', !!active);
     },
     getPath(edgeId) {
       return edgeViews[edgeId]?.path || null;

@@ -84,7 +84,7 @@ function buildNodeContent(node) {
   bottomSlot.className = 'fg-node-slot fg-node-slot-bottom fg-node-bottom-pills';
   shell.appendChild(bottomSlot);
 
-  return { shell, bottomSlot };
+  return { shell, topSlot, bottomSlot };
 }
 
 export function renderNodes(nodesLayer, nodes, theme) {
@@ -108,7 +108,7 @@ export function renderNodes(nodesLayer, nodes, theme) {
 
     const { w, h } = node.size;
     const chrome = pillChrome(node);
-    const { shell, bottomSlot } = buildNodeContent(node);
+    const { shell, topSlot, bottomSlot } = buildNodeContent(node);
     const fo = document.createElementNS(NS, 'foreignObject');
     fo.setAttribute('x', String(-w / 2 - chrome.left));
     fo.setAttribute('y', String(-h / 2 - chrome.top));
@@ -119,11 +119,20 @@ export function renderNodes(nodesLayer, nodes, theme) {
     g.appendChild(fo);
 
     nodesLayer.appendChild(g);
-    nodeViews[node.id] = { g, shape, fo, node, bottomSlot };
+    nodeViews[node.id] = { g, shape, fo, node, topSlot, bottomSlot };
   });
 
   return {
     nodeViews,
+    setPillsTop(nodeId, pills) {
+      const view = nodeViews[nodeId];
+      if (!view) return;
+      view.topSlot.innerHTML = '';
+      (pills || []).forEach((p) => view.topSlot.appendChild(renderPillEl(p, 'top')));
+      if (typeof window !== 'undefined' && window.lucide) {
+        window.lucide.createIcons({ nodes: view.topSlot.querySelectorAll('[data-lucide]') });
+      }
+    },
     setPillsBottom(nodeId, pills) {
       const view = nodeViews[nodeId];
       if (!view) return;
@@ -136,13 +145,18 @@ export function renderNodes(nodesLayer, nodes, theme) {
     setEffect(nodeId, effect) {
       const view = nodeViews[nodeId];
       if (!view) return;
-      view.g.classList.remove('fg-effect-pulse', 'fg-effect-blink', 'fg-effect-processing', 'fg-effect-waiting', 'fg-effect-active');
+      view.g.classList.remove('fg-effect-pulse', 'fg-effect-blink', 'fg-effect-processing', 'fg-effect-waiting', 'fg-effect-active', 'fg-effect-open');
       if (effect) view.g.classList.add(`fg-effect-${effect}`);
     },
     setActive(nodeId, active) {
       const view = nodeViews[nodeId];
       if (!view) return;
       view.g.classList.toggle('fg-node-active', !!active);
+    },
+    setStepActive(nodeId, active) {
+      const view = nodeViews[nodeId];
+      if (!view) return;
+      view.g.classList.toggle('fg-node-step-active', !!active);
     },
     setSelected(nodeId, selected) {
       const view = nodeViews[nodeId];

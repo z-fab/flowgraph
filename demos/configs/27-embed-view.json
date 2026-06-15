@@ -1,17 +1,113 @@
 {
   "title": "Pipeline (view-only)",
-  "viewport": { "height": 280, "padding": 40 },
-  "interaction": { "nodeDrag": false, "nodeSelect": false },
-  "controls": { "toolbar": false, "title": false },
-  "metrics": { "nodeDrawer": false, "globalDrawer": false, "nodePanel": false, "systemPanel": false },
+  "viewport": {
+    "height": 280,
+    "padding": 40
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "toolbar": false,
+    "title": false,
+    "metricsDrawer": false
+  },
+  "interaction": {
+    "nodeDrag": false,
+    "nodeSelect": false
+  },
   "nodes": [
-    { "id": "a", "type": "port", "role": "source", "shape": "circle", "icon": "log-in", "x": 100, "y": 140 },
-    { "id": "b", "type": "process", "label": "Process", "icon": "cog", "duration": 700, "x": 280, "y": 140 },
-    { "id": "c", "type": "port", "role": "terminal", "label": "Out", "icon": "log-out", "tone": "success", "x": 460, "y": 140 }
+    {
+      "id": "a",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "log-in",
+      "x": 100,
+      "y": 140
+    },
+    {
+      "id": "b",
+      "type": "process",
+      "label": "Process",
+      "icon": "cog",
+      "x": 280,
+      "y": 140
+    },
+    {
+      "id": "c",
+      "type": "port",
+      "role": "terminal",
+      "label": "Out",
+      "icon": "log-out",
+      "tone": "success",
+      "x": 460,
+      "y": 140
+    }
   ],
   "edges": [
-    { "id": "ab", "from": "a", "to": "b" },
-    { "id": "bc", "from": "b", "to": "c", "stroke": { "color": "success" } }
+    {
+      "id": "ab",
+      "from": "a",
+      "to": "b"
+    },
+    {
+      "id": "bc",
+      "from": "b",
+      "to": "c",
+      "stroke": {
+        "color": "success"
+      }
+    }
   ],
-  "sources": [{ "edge": "ab", "interval": 2400 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "bottom-left",
+      "maxWidth": 300
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Modo embed",
+          "description": "Visualização mínima para iframe — sem toolbar, sem drag. O fluxo anima automaticamente.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "ab",
+          "token": "default",
+          "title": "Entrada",
+          "description": "Dado entra no pipeline."
+        }
+      },
+      {
+        "dwell": {
+          "node": "b",
+          "effect": "processing",
+          "ms": 650,
+          "title": "Process",
+          "description": "Transformação aplicada ao registro."
+        }
+      },
+      {
+        "travel": {
+          "edge": "bc",
+          "token": "default",
+          "title": "Saída",
+          "description": "Resultado entregue ao destino."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }

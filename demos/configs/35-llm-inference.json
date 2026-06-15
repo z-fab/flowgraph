@@ -1,0 +1,336 @@
+{
+  "title": "LLM inference",
+  "viewport": {
+    "height": 380,
+    "padding": 55
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "shape": "rect",
+    "size": 5,
+    "speed": 95
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "shape": "rect",
+      "size": 5,
+      "speed": 95
+    },
+    "edge": {
+      "color": "#3D6B52",
+      "shape": "rect",
+      "size": 5
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
+  "nodes": [
+    {
+      "id": "prompt",
+      "type": "port",
+      "role": "source",
+      "label": "User prompt",
+      "shape": "circle",
+      "icon": "message-square",
+      "x": 70,
+      "y": 190
+    },
+    {
+      "id": "prefill",
+      "type": "process",
+      "label": "Prefill pass",
+      "icon": "layers",
+      "x": 230,
+      "y": 190,
+      "tone": "primary",
+      "pillTop": [
+        {
+          "text": "TTFT",
+          "tone": "primary"
+        }
+      ]
+    },
+    {
+      "id": "kv",
+      "type": "process",
+      "label": "KV Cache",
+      "icon": "database",
+      "x": 400,
+      "y": 190,
+      "pillTop": [
+        {
+          "text": "KV cached",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "decode",
+      "type": "process",
+      "label": "Decode",
+      "icon": "cpu",
+      "x": 560,
+      "y": 190,
+      "pillTop": [
+        {
+          "text": "6× tokens",
+          "tone": "primary"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "ep",
+      "from": "prompt",
+      "to": "prefill",
+      "label": {
+        "text": "prompt"
+      }
+    },
+    {
+      "id": "pkv",
+      "from": "prefill",
+      "to": "kv",
+      "stroke": {
+        "color": "success"
+      }
+    },
+    {
+      "id": "kvd",
+      "from": "kv",
+      "to": "decode",
+      "label": {
+        "text": "KV hit"
+      }
+    },
+    {
+      "id": "ds",
+      "from": "decode",
+      "to": "prompt",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success",
+        "dash": "dot"
+      },
+      "label": {
+        "text": "SSE chunks"
+      },
+      "token": {
+        "color": "#3D6B52",
+        "shape": "rect",
+        "size": 5
+      }
+    }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 600,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left"
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Inferência LLM",
+          "description": "Prefill processa o prompt inteiro; decode gera tokens um a um reutilizando o KV cache.",
+          "ms": 950
+        }
+      },
+      {
+        "travel": {
+          "edge": "ep",
+          "token": "default",
+          "title": "Prompt → Prefill",
+          "description": "Todos os tokens de entrada em um único forward pass."
+        }
+      },
+      {
+        "dwell": {
+          "node": "prefill",
+          "effect": "processing",
+          "ms": 500,
+          "title": "Prefill pass",
+          "description": "TTFT — tempo até o primeiro token; computa K e V de cada posição."
+        }
+      },
+      {
+        "travel": {
+          "edge": "pkv",
+          "token": "default",
+          "title": "Prefill → KV Cache",
+          "description": "Tensores K/V persistidos em GPU memory."
+        }
+      },
+      {
+        "dwell": {
+          "node": "kv",
+          "effect": "processing",
+          "ms": 180,
+          "title": "KV Cache",
+          "description": "Cache hit evita recomputar atenção sobre o prompt."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Decode autoregressivo",
+          "description": "Cada token novo consulta o cache e emite um chunk via SSE.",
+          "ms": 750
+        }
+      },
+      {
+        "travel": {
+          "edge": "kvd",
+          "token": "default",
+          "title": "KV → Decode (token 1)",
+          "description": "Apenas o último token passa pelo modelo."
+        }
+      },
+      {
+        "dwell": {
+          "node": "decode",
+          "effect": "processing",
+          "ms": 200,
+          "title": "Decode",
+          "description": "Amostra o próximo token do vocabulário."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ds",
+          "token": "edge",
+          "title": "Stream token 1",
+          "description": "Chunk SSE enviado ao cliente."
+        }
+      },
+      {
+        "travel": {
+          "edge": "kvd",
+          "token": "default",
+          "title": "KV → Decode (token 2)",
+          "description": "KV cache atualizado com o token gerado."
+        }
+      },
+      {
+        "dwell": {
+          "node": "decode",
+          "effect": "processing",
+          "ms": 180,
+          "title": "Decode",
+          "description": "Iteração autoregressiva — O(1) por token com cache."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ds",
+          "token": "edge",
+          "title": "Stream token 2",
+          "delay": 60
+        }
+      },
+      {
+        "travel": {
+          "edge": "kvd",
+          "token": "default",
+          "title": "KV → Decode (token 3)"
+        }
+      },
+      {
+        "dwell": {
+          "node": "decode",
+          "effect": "processing",
+          "ms": 160,
+          "title": "Decode"
+        }
+      },
+      {
+        "travel": {
+          "edge": "ds",
+          "token": "edge",
+          "title": "Stream token 3",
+          "delay": 60
+        }
+      },
+      {
+        "travel": {
+          "edge": "kvd",
+          "token": "default",
+          "title": "KV → Decode (token 4)"
+        }
+      },
+      {
+        "dwell": {
+          "node": "decode",
+          "effect": "processing",
+          "ms": 160,
+          "title": "Decode"
+        }
+      },
+      {
+        "travel": {
+          "edge": "ds",
+          "token": "edge",
+          "title": "Stream token 4",
+          "delay": 60
+        }
+      },
+      {
+        "travel": {
+          "edge": "kvd",
+          "token": "default",
+          "title": "KV → Decode (token 5)"
+        }
+      },
+      {
+        "dwell": {
+          "node": "decode",
+          "effect": "processing",
+          "ms": 160,
+          "title": "Decode"
+        }
+      },
+      {
+        "travel": {
+          "edge": "ds",
+          "token": "edge",
+          "title": "Stream token 5",
+          "delay": 60
+        }
+      },
+      {
+        "travel": {
+          "edge": "kvd",
+          "token": "default",
+          "title": "KV → Decode (token 6)",
+          "description": "Último token da sequência gerada."
+        }
+      },
+      {
+        "dwell": {
+          "node": "decode",
+          "effect": "processing",
+          "ms": 160,
+          "title": "Decode",
+          "description": "EOS ou limite de max_tokens."
+        }
+      },
+      {
+        "travel": {
+          "edge": "ds",
+          "token": "edge",
+          "title": "Stream token 6",
+          "description": "Resposta completa transmitida via SSE.",
+          "delay": 60
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
+}

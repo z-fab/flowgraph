@@ -1,22 +1,322 @@
 {
   "title": "API Gateway",
-  "viewport": { "height": 380, "padding": 55 },
+  "viewport": {
+    "height": 380,
+    "padding": 55
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED"
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "client", "type": "port", "role": "source", "label": "Client", "shape": "circle", "icon": "smartphone", "x": 80, "y": 190 },
-    { "id": "gw", "type": "process", "label": "Gateway", "icon": "router", "duration": 350, "emit": { "mode": "weighted" }, "x": 240, "y": 190 },
-    { "id": "auth", "type": "process", "label": "Auth", "icon": "key", "duration": 500, "x": 420, "y": 80, "tone": "primary" },
-    { "id": "bill", "type": "process", "label": "Billing", "icon": "credit-card", "duration": 700, "x": 420, "y": 190, "tone": "warning" },
-    { "id": "core", "type": "process", "label": "Core", "icon": "server", "duration": 900, "x": 420, "y": 300 },
-    { "id": "out", "type": "port", "role": "terminal", "label": "Response", "icon": "check", "tone": "success", "x": 600, "y": 190 }
+    {
+      "id": "client",
+      "type": "port",
+      "role": "source",
+      "label": "Client",
+      "shape": "circle",
+      "icon": "smartphone",
+      "x": 80,
+      "y": 190
+    },
+    {
+      "id": "gw",
+      "type": "process",
+      "label": "Gateway",
+      "icon": "router",
+      "x": 240,
+      "y": 190
+    },
+    {
+      "id": "auth",
+      "type": "process",
+      "label": "Auth",
+      "icon": "key",
+      "x": 420,
+      "y": 80,
+      "tone": "primary"
+    },
+    {
+      "id": "bill",
+      "type": "process",
+      "label": "Billing",
+      "icon": "credit-card",
+      "x": 420,
+      "y": 190,
+      "tone": "warning"
+    },
+    {
+      "id": "core",
+      "type": "process",
+      "label": "Core",
+      "icon": "server",
+      "x": 420,
+      "y": 300
+    }
   ],
   "edges": [
-    { "id": "c", "from": "client", "to": "gw" },
-    { "id": "a", "from": "gw", "to": "auth", "weight": 3, "label": { "text": "/auth" } },
-    { "id": "b", "from": "gw", "to": "bill", "weight": 2, "label": { "text": "/bill" } },
-    { "id": "k", "from": "gw", "to": "core", "weight": 5, "label": { "text": "/api" } },
-    { "id": "ra", "from": "auth", "to": "out", "stroke": { "dash": "dash" } },
-    { "id": "rb", "from": "bill", "to": "out", "stroke": { "dash": "dash" } },
-    { "id": "rk", "from": "core", "to": "out", "stroke": { "color": "success" } }
+    {
+      "id": "c",
+      "from": "client",
+      "to": "gw"
+    },
+    {
+      "id": "a",
+      "from": "gw",
+      "to": "auth",
+      "label": {
+        "text": "/auth"
+      }
+    },
+    {
+      "id": "b",
+      "from": "gw",
+      "to": "bill",
+      "label": {
+        "text": "/bill"
+      }
+    },
+    {
+      "id": "k",
+      "from": "gw",
+      "to": "core",
+      "label": {
+        "text": "/api"
+      }
+    },
+    {
+      "id": "ra",
+      "from": "auth",
+      "to": "gw",
+      "routing": "loopback",
+      "loopSide": "above",
+      "stroke": {
+        "dash": "dash"
+      },
+      "label": {
+        "text": "201 token"
+      }
+    },
+    {
+      "id": "rb",
+      "from": "bill",
+      "to": "gw",
+      "routing": "loopback",
+      "stroke": {
+        "dash": "dash"
+      },
+      "label": {
+        "text": "202 billed"
+      }
+    },
+    {
+      "id": "rk",
+      "from": "core",
+      "to": "gw",
+      "routing": "loopback",
+      "loopSide": "below",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "200 predict"
+      }
+    },
+    {
+      "id": "rc",
+      "from": "gw",
+      "to": "client",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "HTTP response"
+      }
+    }
   ],
-  "sources": [{ "edge": "c", "interval": 2500, "jitter": 400 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 500,
+    "tracksPresentation": "sequential",
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "tracks": [
+      {
+        "id": "auth",
+        "label": "/auth",
+        "offset": 0,
+        "steps": [
+          {
+            "narrate": {
+              "title": "Rota /auth",
+              "description": "Cada requisição HTTP segue um único path — o gateway roteia e devolve a resposta ao cliente.",
+              "ms": 700
+            }
+          },
+          {
+            "travel": {
+              "edge": "c",
+              "token": "default",
+              "title": "POST /auth/refresh",
+              "description": "App mobile renova access token."
+            }
+          },
+          {
+            "dwell": {
+              "node": "gw",
+              "effect": "processing",
+              "ms": 300,
+              "title": "Gateway",
+              "description": "Kong resolve rota /auth e injeta trace-id."
+            }
+          },
+          {
+            "travel": {
+              "edge": "a",
+              "token": "default",
+              "title": "→ Auth Service"
+            }
+          },
+          {
+            "dwell": {
+              "node": "auth",
+              "effect": "processing",
+              "ms": 500,
+              "title": "Auth",
+              "description": "Validação JWT + emissão de access token (15 min TTL)."
+            }
+          },
+          {
+            "travel": {
+              "edge": "ra",
+              "token": "default",
+              "title": "Token → Gateway"
+            }
+          },
+          {
+            "travel": {
+              "edge": "rc",
+              "token": "default",
+              "title": "201 → Client",
+              "description": "Novo access token entregue ao app mobile."
+            }
+          }
+        ]
+      },
+      {
+        "id": "bill",
+        "label": "/bill",
+        "offset": 2500,
+        "steps": [
+          {
+            "travel": {
+              "edge": "c",
+              "token": "default",
+              "title": "POST /bill/webhook"
+            }
+          },
+          {
+            "dwell": {
+              "node": "gw",
+              "effect": "processing",
+              "ms": 300,
+              "title": "Gateway"
+            }
+          },
+          {
+            "travel": {
+              "edge": "b",
+              "token": "default",
+              "title": "→ Billing"
+            }
+          },
+          {
+            "dwell": {
+              "node": "bill",
+              "effect": "processing",
+              "ms": 700,
+              "title": "Billing",
+              "description": "Registro de usage-based billing por chamada de API."
+            }
+          },
+          {
+            "travel": {
+              "edge": "rb",
+              "token": "default",
+              "title": "Ack → Gateway"
+            }
+          },
+          {
+            "travel": {
+              "edge": "rc",
+              "token": "default",
+              "title": "202 → Client"
+            }
+          }
+        ]
+      },
+      {
+        "id": "core",
+        "label": "/api",
+        "offset": 5000,
+        "steps": [
+          {
+            "travel": {
+              "edge": "c",
+              "token": "default",
+              "title": "GET /api/v1/predict"
+            }
+          },
+          {
+            "dwell": {
+              "node": "gw",
+              "effect": "processing",
+              "ms": 350,
+              "title": "Gateway",
+              "description": "Rate limit (100 req/min) e roteamento para Core."
+            }
+          },
+          {
+            "travel": {
+              "edge": "k",
+              "token": "default",
+              "title": "→ Core Service"
+            }
+          },
+          {
+            "dwell": {
+              "node": "core",
+              "effect": "processing",
+              "ms": 900,
+              "title": "Core",
+              "description": "Execução da predição e montagem da resposta JSON."
+            }
+          },
+          {
+            "travel": {
+              "edge": "rk",
+              "token": "default",
+              "title": "Score → Gateway"
+            }
+          },
+          {
+            "travel": {
+              "edge": "rc",
+              "token": "default",
+              "title": "200 OK → Client",
+              "description": "Predição entregue ao cliente na mesma conexão HTTP."
+            }
+          }
+        ]
+      }
+    ]
+  }
 }

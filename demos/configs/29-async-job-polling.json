@@ -1,0 +1,189 @@
+{
+  "title": "Async job API",
+  "controls": { "layout": true },
+  "viewport": { "height": 520, "padding": 60 },
+  "tokens": { "color": "#7C3AED", "size": 6, "speed": 100 },
+  "tokenTypes": {
+    "request": { "shape": "circle", "color": "#7C3AED", "size": 6, "speed": 100 },
+    "jobId": { "shape": "rect", "color": "#3D6B52", "size": 6, "speed": 90 },
+    "poll": { "shape": "rect", "color": "#3D6B52", "size": 5, "speed": 80, "countMetrics": false },
+    "result": { "shape": "rect", "color": "#059669", "size": 6, "speed": 85, "countMetrics": false }
+  },
+  "scenario": {
+    "loop": true,
+    "defaultMode": "play",
+    "playInterval": 420,
+    "tracksPresentation": "parallel",
+    "narration": { "showOnCanvas": true, "position": "top-left", "maxWidth": 340 },
+    "tracks": [
+      {
+        "id": "predict",
+        "label": "POST /predict",
+        "offset": 0,
+        "steps": [
+          {
+            "travel": {
+              "edge": "e-post",
+              "token": "request",
+              "title": "POST /predict",
+              "description": "Cliente envia requisição de predição para a API."
+            }
+          },
+          {
+            "dwell": {
+              "node": "post",
+              "effect": "processing",
+              "ms": 450,
+              "title": "API aceita",
+              "description": "Valida payload e prepara job assíncrono."
+            }
+          },
+          {
+            "parallel": [
+              {
+                "travel": {
+                  "edge": "e-job",
+                  "token": "request",
+                  "title": "INSERT job",
+                  "description": "Persiste registro pending no PostgreSQL."
+                }
+              },
+              {
+                "travel": {
+                  "edge": "e-publish",
+                  "token": "request",
+                  "delay": 80,
+                  "title": "PUBLISH",
+                  "description": "Publica mensagem na fila RabbitMQ."
+                }
+              },
+              {
+                "travel": {
+                  "edge": "e-202",
+                  "token": "jobId",
+                  "delay": 120,
+                  "title": "202 Accepted",
+                  "description": "API responde imediatamente com jobId — cliente não bloqueia."
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "worker",
+        "label": "Worker",
+        "offset": 900,
+        "steps": [
+          {
+            "travel": {
+              "edge": "e-consume",
+              "token": "request",
+              "title": "CONSUME",
+              "description": "Worker consome mensagem da fila (não do banco)."
+            }
+          },
+          {
+            "dwell": {
+              "node": "orch",
+              "effect": "processing",
+              "ms": 350,
+              "title": "Roteamento",
+              "description": "Orchestrator seleciona worker disponível."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e-w1",
+              "token": "request",
+              "title": "→ Worker 1"
+            }
+          },
+          {
+            "dwell": {
+              "node": "w1",
+              "effect": "processing",
+              "ms": 700,
+              "title": "Inferência",
+              "description": "Worker 1 executa predição em background."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e-w1-db",
+              "token": "request",
+              "title": "UPDATE complete",
+              "description": "Worker atualiza status no Job DB."
+            }
+          }
+        ]
+      },
+      {
+        "id": "poll",
+        "label": "GET /status",
+        "offset": 1500,
+        "steps": [
+          {
+            "travel": {
+              "edge": "e-poll",
+              "token": "poll",
+              "title": "Polling",
+              "description": "Mesmo cliente consulta status com o jobId recebido."
+            }
+          },
+          {
+            "dwell": {
+              "node": "get",
+              "effect": "waiting",
+              "ms": 400,
+              "title": "GET /status",
+              "description": "API consulta o banco até status complete."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e-read",
+              "token": "request",
+              "countMetrics": false,
+              "title": "SELECT status",
+              "description": "Handler lê registro no PostgreSQL (consulta, não grava)."
+            }
+          },
+          {
+            "travel": {
+              "edge": "e-200",
+              "token": "result",
+              "title": "200 OK",
+              "description": "API devolve resultado ao cliente via HTTP."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "nodes": [
+    { "id": "client", "type": "port", "role": "source", "label": "Client", "shape": "circle", "icon": "user", "x": 80, "y": 250 },
+    { "id": "post", "type": "process", "label": "POST /predict", "icon": "server", "x": 300, "y": 150, "pillTop": [{ "text": "accept", "tone": "primary" }] },
+    { "id": "jobDb", "type": "process", "label": "Job DB", "icon": "database", "x": 540, "y": 80, "metrics": { "queue": { "max": 8 }, "count": true } },
+    { "id": "queue", "type": "process", "label": "RabbitMQ", "icon": "inbox", "x": 540, "y": 250, "metrics": { "queue": { "max": 6 } } },
+    { "id": "orch", "type": "process", "label": "Consumer", "icon": "layers", "x": 740, "y": 250 },
+    { "id": "w1", "type": "process", "label": "Worker 1", "icon": "cpu", "tone": "warning", "x": 960, "y": 180 },
+    { "id": "w2", "type": "process", "label": "Worker 2", "icon": "cpu", "x": 960, "y": 250 },
+    { "id": "w3", "type": "process", "label": "Worker 3", "icon": "cpu", "x": 960, "y": 320 },
+    { "id": "get", "type": "process", "label": "GET /status", "icon": "search", "x": 300, "y": 370, "pillTop": [{ "text": "poll", "tone": "primary" }] }
+  ],
+  "edges": [
+    { "id": "e-post", "from": "client", "to": "post", "label": { "text": "POST" } },
+    { "id": "e-job", "from": "post", "to": "jobDb", "routing": "orthogonal", "label": { "text": "INSERT" } },
+    { "id": "e-publish", "from": "post", "to": "queue", "routing": "orthogonal", "label": { "text": "PUBLISH" } },
+    { "id": "e-202", "from": "post", "to": "client", "stroke": { "color": "success" }, "label": { "text": "202 + jobId" } },
+    { "id": "e-consume", "from": "queue", "to": "orch", "routing": "orthogonal", "label": { "text": "CONSUME" } },
+    { "id": "e-w1", "from": "orch", "to": "w1", "routing": "orthogonal", "label": { "text": "route" } },
+    { "id": "e-w2", "from": "orch", "to": "w2", "routing": "orthogonal", "stroke": { "dash": "dot", "color": "#CEC9BF" }, "label": { "text": "idle" } },
+    { "id": "e-w3", "from": "orch", "to": "w3", "routing": "orthogonal", "stroke": { "dash": "dot", "color": "#CEC9BF" }, "label": { "text": "idle" } },
+    { "id": "e-w1-db", "from": "w1", "to": "jobDb", "routing": "loopback", "loopSide": "above", "stroke": { "color": "success", "dash": "dash" }, "label": { "text": "UPDATE" } },
+    { "id": "e-poll", "from": "client", "to": "get", "stroke": { "dash": "dash", "color": "primary" }, "label": { "text": "GET ?id=" } },
+    { "id": "e-read", "from": "get", "to": "jobDb", "routing": "orthogonal", "stroke": { "dash": "dot" }, "label": { "text": "SELECT" } },
+    { "id": "e-200", "from": "get", "to": "client", "stroke": { "color": "success" }, "label": { "text": "200 OK" } }
+  ]
+}

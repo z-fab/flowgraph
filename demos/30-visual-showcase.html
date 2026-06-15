@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual showcase — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">30 — Visual showcase</span></nav>
+  <div class="demo-wrap">
+    <h1>Showcase visual v2</h1>
+    <p class="lead">Tour único: travel, dwell, parallel, token types, setPill, setEffect, reverse e loopback — substitui as demos básicas 01–03 e 24.</p>
+    <div class="demo-tags"><span class="demo-tag">fundamentos</span></div>
+    <div id="demo"></div>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/30-visual-showcase.json');
+  </script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+{
+  "title": "Checkout saga",
+  "viewport": { "height": 400, "padding": 55 },
+  "tokenTypes": {
+    "order": { "color": "#7C3AED", "speed": 95, "shape": "roundedRect", "size": 7 },
+    "payment": { "color": "#3D6B52", "speed": 90, "shape": "rect", "size": 6 },
+    "compensate": { "color": "#9B1C1C", "speed": 110, "shape": "rect", "size": 6 }
+  },
+  "controls": { "step": true, "metricsDrawer": false },
+  "nodes": [
+    { "id": "user", "type": "port", "role": "source", "label": "Cliente", "icon": "shopping-cart", "shape": "circle", "x": 70, "y": 200 },
+    { "id": "api", "type": "process", "label": "Checkout API", "icon": "server", "x": 210, "y": 200, "pillTop": [{ "text": "saga", "tone": "primary" }] },
+    { "id": "inventory", "type": "process", "label": "Inventory", "icon": "package", "x": 400, "y": 100, "pillTop": [{ "text": "stock", "tone": "warning" }] },
+    { "id": "payment", "type": "process", "label": "Payment", "icon": "credit-card", "x": 400, "y": 300, "pillTop": [{ "text": "pending", "tone": "primary" }] },
+    { "id": "refund", "type": "port", "role": "sink", "label": "Refund", "icon": "undo", "tone": "danger", "x": 600, "y": 300 }
+  ],
+  "edges": [
+    { "id": "e0", "from": "user", "to": "api", "label": { "text": "checkout" } },
+    { "id": "e1", "from": "api", "to": "inventory", "label": { "text": "reserve" }, "stroke": { "color": "warning" } },
+    { "id": "e2", "from": "api", "to": "payment", "label": { "text": "charge" }, "stroke": { "color": "success" } },
+    { "id": "e3", "from": "inventory", "to": "api", "routing": "loopback", "loopSide": "above", "stroke": { "dash": "dash" }, "label": { "text": "reserved" } },
+    { "id": "e4", "from": "payment", "to": "api", "routing": "loopback", "loopSide": "below", "label": { "text": "paid" } },
+    { "id": "e8", "from": "api", "to": "user", "routing": "bezier", "stroke": { "color": "success", "width": 2 }, "label": { "text": "201 Order OK" } },
+    { "id": "e9", "from": "api", "to": "user", "routing": "bezier", "stroke": { "color": "danger", "dash": "dash" }, "label": { "text": "409 Failed" } },
+    { "id": "e6", "from": "payment", "to": "refund", "routing": "straight", "stroke": { "color": "danger", "dash": "dash" }, "label": { "text": "void" } },
+    { "id": "e7", "from": "inventory", "to": "api", "routing": "straight", "stroke": { "color": "danger", "dash": "dot" }, "label": { "text": "release" } }
+  ],
+  "scenario": {
+    "loop": true,
+    "playInterval": 520,
+    "narration": { "showOnCanvas": true, "position": "top-left", "maxWidth": 360 },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Saga pattern — happy path",
+          "description": "Reserva de estoque e cobrança em passos compensáveis. Se pagamento falhar, estoque é liberado.",
+          "ms": 1000
+        }
+      },
+      {
+        "travel": {
+          "edge": "e0",
+          "token": "order",
+          "title": "Iniciar checkout",
+          "description": "Cliente submete carrinho com 2 itens."
+        }
+      },
+      {
+        "dwell": {
+          "node": "api",
+          "effect": "processing",
+          "ms": 350,
+          "title": "Orquestrador saga",
+          "description": "Abre transação distribuída sem 2PC."
+        }
+      },
+      {
+        "parallel": [
+          {
+            "travel": {
+              "edge": "e1",
+              "token": "order",
+              "title": "Reserve stock"
+            }
+          },
+          {
+            "travel": {
+              "edge": "e2",
+              "token": "payment",
+              "delay": 200,
+              "title": "Authorize payment"
+            }
+          }
+        ]
+      },
+      {
+        "parallel": [
+          {
+            "dwell": {
+              "node": "inventory",
+              "effect": "processing",
+              "ms": 400,
+              "title": "Inventory",
+              "description": "SKU-42: 2 unidades reservadas."
+            }
+          },
+          {
+            "dwell": {
+              "node": "payment",
+              "effect": "processing",
+              "ms": 500,
+              "title": "Payment gateway",
+              "description": "Pré-autorização R$ 189,90 aprovada.",
+              "delay": 100
+            }
+          }
+        ]
+      },
+      {
+        "setPill": { "node": "inventory", "pill": "reserved", "tone": "success" }
+      },
+      {
+        "setPill": { "node": "payment", "pill": "captured", "tone": "success" }
+      },
+      {
+        "travel": {
+          "edge": "e3",
+          "token": "order",
+          "title": "Inventory → API",
+          "description": "Confirmação de reserva retorna ao orquestrador."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e4",
+          "token": "payment",
+          "title": "Payment → API",
+          "description": "Confirmação de pagamento retorna ao orquestrador."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e8",
+          "token": "order",
+          "title": "201 Order OK → Cliente",
+          "description": "Pedido #8842 confirmado — resposta HTTP ao cliente."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Compensação — pagamento falhou",
+          "description": "Na próxima iteração: estoque já reservado, charge recusada → release + refund.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": { "edge": "e0", "token": "order", "title": "Retry checkout" }
+      },
+      {
+        "travel": { "edge": "e1", "token": "order", "title": "Reserve (ok)" }
+      },
+      {
+        "setPill": { "node": "inventory", "pill": "reserved", "tone": "warning" }
+      },
+      {
+        "dwell": {
+          "node": "payment",
+          "effect": "waiting",
+          "ms": 400,
+          "title": "Charge declined",
+          "description": "Cartão recusado — iniciar compensação."
+        }
+      },
+      {
+        "travel": {
+          "edge": "e7",
+          "token": "compensate",
+          "title": "Release stock",
+          "description": "Compensação: inventory notifica liberação da reserva."
+        }
+      },
+      {
+        "setPill": { "node": "inventory", "pill": "released", "tone": "primary" }
+      },
+      {
+        "travel": {
+          "edge": "e6",
+          "token": "compensate",
+          "title": "Void authorization"
+        }
+      },
+      {
+        "setPill": { "node": "payment", "pill": "voided", "tone": "danger" }
+      },
+      {
+        "travel": {
+          "edge": "e9",
+          "token": "compensate",
+          "title": "409 Failed → Cliente",
+          "description": "Checkout abortado — cliente recebe erro após compensação."
+        }
+      },
+      {
+        "setPill": { "node": "api", "pill": "aborted", "tone": "danger" }
+      },
+      { "wait": { "ms": 1200 } }
+    ]
+  }
+}

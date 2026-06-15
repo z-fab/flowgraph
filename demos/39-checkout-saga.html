@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout saga — FlowGraph</title>
+  <link rel="stylesheet" href="../flowgraph.css">
+  <link rel="stylesheet" href="assets/demo.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="demo-nav"><a href="index.html">← Galeria</a><span class="sep">|</span><span style="font-size:0.85rem;color:#6B6560">39 — Checkout saga</span></nav>
+  <div class="demo-wrap">
+    <h1>Checkout saga</h1>
+    <p class="lead">Saga com confirmações de inventory/payment de volta à API e resposta 201/409 ao cliente. Compensação via release + refund.</p>
+    <div class="demo-tags"><span class="demo-tag ops">saga</span></div>
+    <div id="demo"></div>
+  </div>
+  <script type="module">
+    import { mountFromURL } from './assets/demo.js';
+    mountFromURL('#demo', './configs/39-checkout-saga.json');
+  </script>
+</body>
+</html>

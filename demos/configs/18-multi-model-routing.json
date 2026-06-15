@@ -1,22 +1,312 @@
 {
   "title": "Smart routing",
-  "viewport": { "height": 400, "padding": 55 },
-  "tokens": { "color": "#7C3AED", "speed": 90, "size": 6 },
+  "viewport": {
+    "height": 400,
+    "padding": 55
+  },
+  "tokens": {
+    "color": "#7C3AED",
+    "speed": 90,
+    "size": 6
+  },
+  "tokenTypes": {
+    "default": {
+      "color": "#7C3AED",
+      "speed": 90,
+      "size": 6
+    },
+    "complex": {
+      "color": "#D97706",
+      "speed": 75,
+      "size": 6
+    }
+  },
+  "controls": {
+    "metricsDrawer": false
+  },
   "nodes": [
-    { "id": "users", "type": "port", "role": "source", "shape": "circle", "icon": "users", "x": 80, "y": 200 },
-    { "id": "router", "type": "process", "label": "Router", "icon": "git-branch", "duration": 450, "emit": { "mode": "weighted" }, "x": 240, "y": 200 },
-    { "id": "slm", "type": "process", "label": "SLM 3B", "icon": "zap", "tone": "success", "duration": 500, "shape": "circle",
-      "pillTop": [{ "text": "fast", "tone": "success" }], "x": 440, "y": 100 },
-    { "id": "llm", "type": "process", "label": "LLM 70B", "icon": "brain", "tone": "warning", "duration": 2000,
-      "pillTop": [{ "text": "quality", "tone": "warning" }], "x": 440, "y": 300 },
-    { "id": "metrics", "type": "port", "role": "sink", "label": "Observability", "icon": "activity", "x": 620, "y": 200, "showReceived": true }
+    {
+      "id": "users",
+      "type": "port",
+      "role": "source",
+      "shape": "circle",
+      "icon": "users",
+      "x": 80,
+      "y": 200
+    },
+    {
+      "id": "router",
+      "type": "process",
+      "label": "Router",
+      "icon": "git-branch",
+      "x": 240,
+      "y": 200
+    },
+    {
+      "id": "slm",
+      "type": "process",
+      "label": "SLM 3B",
+      "icon": "zap",
+      "tone": "success",
+      "shape": "circle",
+      "pillTop": [
+        {
+          "text": "fast",
+          "tone": "success"
+        }
+      ],
+      "x": 440,
+      "y": 100
+    },
+    {
+      "id": "llm",
+      "type": "process",
+      "label": "LLM 70B",
+      "icon": "brain",
+      "tone": "warning",
+      "pillTop": [
+        {
+          "text": "quality",
+          "tone": "warning"
+        }
+      ],
+      "x": 440,
+      "y": 300
+    },
+    {
+      "id": "metrics",
+      "type": "port",
+      "role": "sink",
+      "label": "Observability",
+      "icon": "activity",
+      "x": 620,
+      "y": 200
+    }
   ],
   "edges": [
-    { "id": "ur", "from": "users", "to": "router" },
-    { "id": "rs", "from": "router", "to": "slm", "weight": 6, "label": { "text": "simple" }, "stroke": { "color": "success" } },
-    { "id": "rl", "from": "router", "to": "llm", "weight": 4, "label": { "text": "complex" }, "stroke": { "color": "warning" } },
-    { "id": "sm", "from": "slm", "to": "metrics", "stroke": { "dash": "dash" } },
-    { "id": "lm", "from": "llm", "to": "metrics", "stroke": { "dash": "dash" } }
+    {
+      "id": "ur",
+      "from": "users",
+      "to": "router"
+    },
+    {
+      "id": "rs",
+      "from": "router",
+      "to": "slm",
+      "label": {
+        "text": "simple"
+      },
+      "stroke": {
+        "color": "success"
+      }
+    },
+    {
+      "id": "rl",
+      "from": "router",
+      "to": "llm",
+      "label": {
+        "text": "complex"
+      },
+      "stroke": {
+        "color": "warning"
+      }
+    },
+    {
+      "id": "sr",
+      "from": "slm",
+      "to": "users",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "200 OK"
+      }
+    },
+    {
+      "id": "lr",
+      "from": "llm",
+      "to": "users",
+      "routing": "bezier",
+      "stroke": {
+        "color": "success"
+      },
+      "label": {
+        "text": "200 OK"
+      }
+    },
+    {
+      "id": "sm",
+      "from": "slm",
+      "to": "metrics",
+      "stroke": {
+        "dash": "dash"
+      }
+    },
+    {
+      "id": "lm",
+      "from": "llm",
+      "to": "metrics",
+      "stroke": {
+        "dash": "dash"
+      }
+    }
   ],
-  "sources": [{ "edge": "ur", "interval": 2800, "jitter": 300 }]
+  "scenario": {
+    "loop": true,
+    "playInterval": 550,
+    "narration": {
+      "showOnCanvas": true,
+      "position": "top-left",
+      "maxWidth": 340
+    },
+    "steps": [
+      {
+        "narrate": {
+          "title": "Roteamento por complexidade",
+          "description": "Um classificador leve estima a dificuldade da requisição e escolhe SLM (rápido) ou LLM (qualidade) para otimizar custo e latência.",
+          "ms": 900
+        }
+      },
+      {
+        "travel": {
+          "edge": "ur",
+          "token": "default",
+          "title": "Requisição simples",
+          "description": "\"Resuma este texto em 3 bullets\" — baixa complexidade."
+        }
+      },
+      {
+        "dwell": {
+          "node": "router",
+          "effect": "processing",
+          "ms": 450,
+          "title": "Router",
+          "description": "Classificador atribui score=0.12 → rota simple."
+        }
+      },
+      {
+        "setPill": {
+          "node": "router",
+          "pill": "score 0.12",
+          "tone": "success",
+          "title": "Baixa complexidade",
+          "description": "Tarefa de sumarização vai para o SLM 3B."
+        }
+      },
+      {
+        "travel": {
+          "edge": "rs",
+          "token": "default",
+          "title": "Router → SLM 3B",
+          "description": "Caminho rápido: ~80 ms TTFT, custo 50× menor."
+        }
+      },
+      {
+        "dwell": {
+          "node": "slm",
+          "effect": "processing",
+          "ms": 500,
+          "title": "SLM 3B",
+          "description": "Modelo pequeno gera resumo conciso em milissegundos."
+        }
+      },
+      {
+        "travel": {
+          "edge": "sr",
+          "token": "default",
+          "title": "Resposta SLM → Cliente",
+          "description": "Sumário entregue ao usuário com baixa latência."
+        }
+      },
+      {
+        "travel": {
+          "edge": "sm",
+          "token": "default",
+          "title": "Métricas SLM",
+          "description": "Latência, tokens e rota registrados no observability stack."
+        }
+      },
+      {
+        "narrate": {
+          "title": "Requisição complexa",
+          "description": "Perguntas de raciocínio multi-etapa exigem o LLM 70B para manter qualidade.",
+          "ms": 800
+        }
+      },
+      {
+        "travel": {
+          "edge": "ur",
+          "token": "complex",
+          "title": "Requisição complexa",
+          "description": "\"Compare abordagens de fine-tuning vs RAG para domínio jurídico\" — alta complexidade."
+        }
+      },
+      {
+        "dwell": {
+          "node": "router",
+          "effect": "processing",
+          "ms": 450,
+          "title": "Router",
+          "description": "Classificador atribui score=0.89 → rota complex."
+        }
+      },
+      {
+        "setPill": {
+          "node": "router",
+          "pill": "score 0.89",
+          "tone": "warning",
+          "title": "Alta complexidade",
+          "description": "Raciocínio profundo exige o LLM 70B."
+        }
+      },
+      {
+        "travel": {
+          "edge": "rl",
+          "token": "complex",
+          "title": "Router → LLM 70B",
+          "description": "Caminho de qualidade: maior latência, resposta mais robusta."
+        }
+      },
+      {
+        "dwell": {
+          "node": "llm",
+          "effect": "processing",
+          "ms": 1200,
+          "title": "LLM 70B",
+          "description": "Modelo grande elabora análise comparativa detalhada."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lr",
+          "token": "complex",
+          "title": "Resposta LLM → Cliente",
+          "description": "Análise detalhada entregue ao usuário."
+        }
+      },
+      {
+        "travel": {
+          "edge": "lm",
+          "token": "complex",
+          "title": "Métricas LLM",
+          "description": "Custo elevado justificado pelo score de complexidade."
+        }
+      },
+      {
+        "setPill": {
+          "node": "router",
+          "pill": "idle",
+          "tone": "primary",
+          "title": "Router ocioso",
+          "description": "Pronto para classificar a próxima requisição."
+        }
+      },
+      {
+        "wait": {
+          "ms": 1200
+        }
+      }
+    ]
+  }
 }
