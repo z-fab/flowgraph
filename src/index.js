@@ -396,15 +396,16 @@ class FlowGraphInstance {
       this._applyStepHighlight({ nodeId: step.node, phase: 'default' });
     }
 
-    const node = cfg.nodesById[step.node];
     const effect = step.effect || 'processing';
-    const savedPillTop = node?.pillTop ? [...node.pillTop] : [];
     this.nodeRenderer.setEffect(step.node, effect);
     this.nodeRenderer.setActive(step.node, true);
     if (effect === 'processing') {
-      this.nodeRenderer.setPillsTop(step.node, [
-        { text: 'running', tone: 'warning', animated: true, icon: '···' },
-      ]);
+      this.nodeRenderer.appendPillBottom(step.node, {
+        text: 'running',
+        tone: 'warning',
+        animated: true,
+        icon: '···',
+      }, 'running');
     }
 
     const base = manual ? 280 : (step.ms || 500);
@@ -413,8 +414,8 @@ class FlowGraphInstance {
 
     this.nodeRenderer.setEffect(step.node, null);
     this.nodeRenderer.setActive(step.node, false);
-    if (effect === 'processing' && node) {
-      this.nodeRenderer.setPillsTop(step.node, savedPillTop);
+    if (effect === 'processing') {
+      this.nodeRenderer.removePillBottomByKey(step.node, 'running');
     }
     if (!this._shouldHighlight()) this._applyStepHighlight(null);
   }

@@ -61,22 +61,6 @@ function createTokenShape(tokenCfg) {
   return g;
 }
 
-function updateTokenElement(el, tokenCfg) {
-  const inner = el._fgInner || el.querySelector('.fg-token-inner');
-  const shapeEl = el._fgShape || el.querySelector('.fg-token-shape');
-  if (!inner || !shapeEl) return;
-  inner.className.baseVal = 'fg-token-inner';
-  if (tokenCfg.effect) inner.classList.add(`fg-token-${tokenCfg.effect}`);
-  applyTokenColor(shapeEl, tokenCfg);
-
-  const label = inner.querySelector('.fg-token-label');
-  if (tokenCfg.label) {
-    addTokenLabel(inner, tokenCfg.label, tokenCfg.size || 7);
-  } else if (label) {
-    label.remove();
-  }
-}
-
 function placeTokenAt(token, t) {
   const progress = token.reverse ? (1 - t) : t;
   const pt = pathPointAt(token.path, progress);
@@ -90,7 +74,6 @@ export class ParticleSystem {
     this.layer = layer;
     this.edgeRenderer = edgeRenderer;
     this.config = config;
-    this.pool = [];
     this.active = [];
     this.maxParticles = config.maxParticles || 200;
     this.speedMultiplier = 1;
@@ -138,19 +121,11 @@ export class ParticleSystem {
   }
 
   _acquireElement(tokenCfg) {
-    if (this.pool.length) {
-      const el = this.pool.pop();
-      el.className.baseVal = 'fg-token';
-      updateTokenElement(el, tokenCfg);
-      return el;
-    }
     return createTokenShape(tokenCfg);
   }
 
   _release(token) {
     token.el.remove();
-    token.el.className.baseVal = 'fg-token';
-    this.pool.push(token.el);
   }
 
   update(dt) {
@@ -194,10 +169,7 @@ export class ParticleSystem {
   }
 
   clear() {
-    this.active.slice().forEach((t) => {
-      t.el.remove();
-      this.pool.push(t.el);
-    });
+    this.active.slice().forEach((t) => t.el.remove());
     this.active = [];
     Object.keys(this.edgeRenderer.edgeViews || {}).forEach((edgeId) => {
       this.edgeRenderer.setActive(edgeId, false);

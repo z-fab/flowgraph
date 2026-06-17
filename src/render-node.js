@@ -142,6 +142,22 @@ export function renderNodes(nodesLayer, nodes, theme) {
         window.lucide.createIcons({ nodes: view.bottomSlot.querySelectorAll('[data-lucide]') });
       }
     },
+    appendPillBottom(nodeId, pill, key) {
+      const view = nodeViews[nodeId];
+      if (!view) return null;
+      const el = renderPillEl(pill, 'bottom');
+      if (key) el.dataset.fgPillKey = key;
+      view.bottomSlot.appendChild(el);
+      if (typeof window !== 'undefined' && window.lucide) {
+        window.lucide.createIcons({ nodes: el.querySelectorAll('[data-lucide]') });
+      }
+      return el;
+    },
+    removePillBottomByKey(nodeId, key) {
+      const view = nodeViews[nodeId];
+      if (!view || !key) return;
+      view.bottomSlot.querySelectorAll(`[data-fg-pill-key="${key}"]`).forEach((el) => el.remove());
+    },
     setEffect(nodeId, effect) {
       const view = nodeViews[nodeId];
       if (!view) return;

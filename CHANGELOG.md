@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-06-16
+
+### Fixed
+
+- **Token pool** — recycled SVG tokens no longer reuse stale shape/size (circle vs rect, radius). Each spawn now creates a fresh element so mixed token types render consistently during streaming.
+- **Processing pill** — `running` indicator during `dwell` + `effect: "processing"` is appended below the node instead of replacing `pillTop`, avoiding layout overflow into the node core and preserving static top pills.
+
 ## [2.0.0] - 2026-06-14
 
 ### Changed (breaking)
@@ -53,4 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Canonical config model: only `port` + `process` (legacy aliases removed).
 - IIFE build uses dedicated entry (`src/iife.js`) for correct global export.
 
+[2.0.1]: https://github.com/z-fab/flowgraph/releases/tag/v2.0.1
+[2.0.0]: https://github.com/z-fab/flowgraph/releases/tag/v2.0.0
 [1.0.0]: https://github.com/z-fab/flowgraph/releases/tag/v1.0.0

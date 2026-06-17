@@ -3160,6 +3160,22 @@ function renderNodes(nodesLayer, nodes, theme) {
         window.lucide.createIcons({ nodes: view.bottomSlot.querySelectorAll("[data-lucide]") });
       }
     },
+    appendPillBottom(nodeId, pill, key) {
+      const view = nodeViews[nodeId];
+      if (!view) return null;
+      const el = renderPillEl(pill, "bottom");
+      if (key) el.dataset.fgPillKey = key;
+      view.bottomSlot.appendChild(el);
+      if (typeof window !== "undefined" && window.lucide) {
+        window.lucide.createIcons({ nodes: el.querySelectorAll("[data-lucide]") });
+      }
+      return el;
+    },
+    removePillBottomByKey(nodeId, key) {
+      const view = nodeViews[nodeId];
+      if (!view || !key) return;
+      view.bottomSlot.querySelectorAll(`[data-fg-pill-key="${key}"]`).forEach((el) => el.remove());
+    },
     setEffect(nodeId, effect) {
       const view = nodeViews[nodeId];
       if (!view) return;
@@ -3249,20 +3265,6 @@ function createTokenShape(tokenCfg) {
   g._fgShape = shapeEl;
   return g;
 }
-function updateTokenElement(el, tokenCfg) {
-  const inner = el._fgInner || el.querySelector(".fg-token-inner");
-  const shapeEl = el._fgShape || el.querySelector(".fg-token-shape");
-  if (!inner || !shapeEl) return;
-  inner.className.baseVal = "fg-token-inner";
-  if (tokenCfg.effect) inner.classList.add(`fg-token-${tokenCfg.effect}`);
-  applyTokenColor(shapeEl, tokenCfg);
-  const label = inner.querySelector(".fg-token-label");
-  if (tokenCfg.label) {
-    addTokenLabel(inner, tokenCfg.label, tokenCfg.size || 7);
-  } else if (label) {
-    label.remove();
-  }
-}
 function placeTokenAt(token, t) {
   const progress = token.reverse ? 1 - t : t;
   const pt = pathPointAt(token.path, progress);
@@ -3275,7 +3277,6 @@ var ParticleSystem = class {
     this.layer = layer;
     this.edgeRenderer = edgeRenderer;
     this.config = config;
-    this.pool = [];
     this.active = [];
     this.maxParticles = config.maxParticles || 200;
     this.speedMultiplier = 1;
@@ -3316,18 +3317,10 @@ var ParticleSystem = class {
     return token;
   }
   _acquireElement(tokenCfg) {
-    if (this.pool.length) {
-      const el = this.pool.pop();
-      el.className.baseVal = "fg-token";
-      updateTokenElement(el, tokenCfg);
-      return el;
-    }
     return createTokenShape(tokenCfg);
   }
   _release(token) {
     token.el.remove();
-    token.el.className.baseVal = "fg-token";
-    this.pool.push(token.el);
   }
   update(dt2) {
     const edgeCounts = {};
@@ -3363,10 +3356,7 @@ var ParticleSystem = class {
     });
   }
   clear() {
-    this.active.slice().forEach((t) => {
-      t.el.remove();
-      this.pool.push(t.el);
-    });
+    this.active.slice().forEach((t) => t.el.remove());
     this.active = [];
     Object.keys(this.edgeRenderer.edgeViews || {}).forEach((edgeId2) => {
       this.edgeRenderer.setActive(edgeId2, false);
@@ -4601,23 +4591,24 @@ var FlowGraphInstance = class {
     if (this._shouldHighlight()) {
       this._applyStepHighlight({ nodeId: step.node, phase: "default" });
     }
-    const node = cfg.nodesById[step.node];
     const effect = step.effect || "processing";
-    const savedPillTop = (node == null ? void 0 : node.pillTop) ? [...node.pillTop] : [];
     this.nodeRenderer.setEffect(step.node, effect);
     this.nodeRenderer.setActive(step.node, true);
     if (effect === "processing") {
-      this.nodeRenderer.setPillsTop(step.node, [
-        { text: "running", tone: "warning", animated: true, icon: "\xB7\xB7\xB7" }
-      ]);
+      this.nodeRenderer.appendPillBottom(step.node, {
+        text: "running",
+        tone: "warning",
+        animated: true,
+        icon: "\xB7\xB7\xB7"
+      }, "running");
     }
     const base = manual ? 280 : step.ms || 500;
     const ms = this.playbackMode === "play" ? base * 0.55 : base;
     await this._stepBeat(ms);
     this.nodeRenderer.setEffect(step.node, null);
     this.nodeRenderer.setActive(step.node, false);
-    if (effect === "processing" && node) {
-      this.nodeRenderer.setPillsTop(step.node, savedPillTop);
+    if (effect === "processing") {
+      this.nodeRenderer.removePillBottomByKey(step.node, "running");
     }
     if (!this._shouldHighlight()) this._applyStepHighlight(null);
   }
